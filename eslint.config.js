@@ -1,7 +1,5 @@
-module.exports = {
-   overrides: [
-      {
-         files: ['*.js', '*.jsx', '*.ts', '*.tsx'],
-      },
-   ],
-};
+module.exports = [
+   {
+      files: ['*.js', '*.jsx', '*.ts', '*.tsx'],
+   },
+];
