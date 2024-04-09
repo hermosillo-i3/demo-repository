@@ -1,0 +1,44 @@
+{
+  "env": {
+    "browser": true,
+    "node": true,
+    "commonjs": true,
+    "es6": true,
+    "jest": true
+  },
+  "plugins": [
+    "jsdoc"
+  ],
+  "extends": [
+    "eslint:recommended",
+    "google"
+  ],
+  "globals": {
+    "Atomics": "readonly",
+    "SharedArrayBuffer": "readonly"
+  },
+  "parserOptions": {
+    "ecmaVersion": 2020
+  },
+  "rules": {
+    "linebreak-style": "off",
+    "semi": "off",
+    "camelcase": "off",
+    "require-jsdoc": "off",
+    "indent": [
+      "error",
+      3,
+      { 
+        "SwitchCase": 1 
+      }
+    ],
+    "max-len": "off",
+    "valid-jsdoc": "off",
+    "new-cap": [
+      "error",
+      {
+        "capIsNewExceptionPattern": "^Sequelize.*|express.Router"
+      }
+    ]
+  }
+}
