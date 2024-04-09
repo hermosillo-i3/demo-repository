@@ -6,7 +6,7 @@ on:
     types: [opened, reopened, synchronize, edited]
 
 jobs:
-  check-version:
+  eslint-check:
     runs-on: ubuntu-latest
 
     steps:
