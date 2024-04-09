@@ -1,5 +1,4 @@
 name: Check eslint configuration
-# This trigger runs on every pull request (created,updated) to the main branch and develop branch. It does not run when a pull request is merged.
 on:
   pull_request:
     branches: [main, develop]
@@ -13,6 +12,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.12.0'
+
+    - name: Install dependencies
+      run: npm install
+
     - name: Check ESLint configuration in settings.json
       run: |
         if grep -q '"editor.defaultFormatter": "dbaeumer.vscode-eslint"' .vscode/settings.json && grep -q '"eslint.format.enable": true' .vscode/settings.json; then
@@ -23,4 +30,4 @@ jobs:
         fi
 
     - name: Run ESLint
-      run: npx eslint .
+      run: npx eslint . --ext .js,.jsx,.ts,.tsx --fix
