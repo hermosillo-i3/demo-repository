@@ -31,4 +31,4 @@ jobs:
         fi
 
     - name: Run ESLint
-      run: npx eslint . --ext .js,.jsx,.ts,.tsx
+      run: eslint . --ext .js,.jsx,.ts,.tsx
