@@ -19,9 +19,9 @@ jobs:
 
     - name: Install ESLint
       run: |
-        yarn global add eslint@8.5.0 
-        yarn global add eslint-config-google@0.14.0 
-        yarn global add eslint-plugin-jsdoc@46.8.2
+        mv package.json package.json.bak
+        yarn add eslint@8.5.0 eslint-config-google@0.14.0 eslint-plugin-jsdoc@46.8.2 --no-save
+        mv package.json.bak package.json
 
     - name: Check ESLint configuration in settings.json
       run: |
