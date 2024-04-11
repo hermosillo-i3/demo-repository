@@ -18,7 +18,7 @@ jobs:
         node-version: 18.12.0
 
     - name: Install ESLint
-      run: yarn add eslint@8.5.0 --no-progress
+      run: npm install --only=dev --no-progress
 
     - name: Check ESLint configuration in settings.json
       run: |
