@@ -1,11 +1,67 @@
 {
-  "name": "demo-repo",
-  "version": "0.2.0",
-  "description": "A sample package.json",
-  "dependencies": {
-    "@primer/css": "17.0.1"
+  "name": "i3-api",
+  "version": "7.16.2",
+  "build": "1689201495",
+  "description": "Five BIM API",
+  "main": "index.js",
+  "engines": {
+    "node": "18.12.0"
   },
+  "scripts": {
+    "dev": " nodemon index.js --ignore 'logs/*' --ignore 'database_migration/*' --ignore 'playground/*'",
+    "test": " set \"NODE_ENV=test\" && jest --detectOpenHandles --runInBand",
+    "debug": " SET \"NODE_ENV=development\" && node --inspect-brk index.js",
+    "migration-db": " npx sequelize-cli db:migrate --env development",
+    "migration-db-undo": " npx sequelize-cli db:migrate:undo",
+    "migration-db-prod": "npx sequelize-cli db:migrate --env production",
+    "migration-skeleton-db": "sequelize-cli db:migrate --migrations-path \"database_migration/skeleton\"",
+    "generate-migration-file": "npx sequelize-cli migration:generate --name ",
+    "generate-skeleton-file": "npx sequelize-cli migration:generate --migrations-path \"database_migration/skeleton\" --name "
+  },
+  "husky": {
+    "hooks": {}
+  },
+  "author": "Julio Ojeda",
   "license": "MIT",
+  "dependencies": {
+    "@hermosillo-i3/logger-pkg": "0.4.14",
+    "@hermosillo-i3/utils-pkg": "1.4.0",
+    "@sendgrid/mail": "^7.7.0",
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.2",
+    "body-parser-xml": "^2.0.5",
+    "cors": "^2.8.5",
+    "decimal.js": "^10.4.3",
+    "docxtemplater": "^3.39.1",
+    "dotenv": "^16.3.1",
+    "excel-formula-tokenizer": "^3.0.0",
+    "exceljs": "^4.3.0",
+    "express": "^4.18.2",
+    "express-async-handler": "^1.2.0",
+    "fast-xml-parser": "^4.3.1",
+    "firebase": "^10.4.0",
+    "forge-apis": "^0.9.6",
+    "fuzzball": "^2.1.2",
+    "generate-password": "^1.7.0",
+    "googleapis": "^126.0.1",
+    "helmet": "^7.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "lodash": "^4.17.21",
+    "mjml": "^4.14.1",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.6.1",
+    "node-fetch": "^2.7.0",
+    "pdf-parse": "^1.1.1",
+    "pdfmake": "^0.2.7",
+    "pizzip": "^3.1.4",
+    "sequelize": "^6.33.0",
+    "sharp": "^0.32.6",
+    "uuid": "^9.0.1",
+    "validator": "^13.11.0",
+    "xml-beautify": "^1.2.3",
+    "xml2js": "^0.6.2",
+    "xmldom": "^0.6.0"
+  },
   "devDependencies": {
     "@types/jest": "^29.5.5",
     "eslint": "^8.50.0",
@@ -17,5 +73,8 @@
     "jest-junit": "^16.0.0",
     "nodemon": "^3.0.1",
     "supertest": "^6.3.3"
+  },
+  "resolutions": {
+    "minipass": "^7.0.3"
   }
 }
