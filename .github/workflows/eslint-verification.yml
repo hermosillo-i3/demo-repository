@@ -33,4 +33,4 @@ jobs:
         fi
 
     - name: Run ESLint
-      run: npx eslint . --ext .js,.jsx,.ts,.tsx --max-warnings
+      run: npx eslint . --ext .js,.jsx,.ts,.tsx --max-warnings=0
