@@ -25,12 +25,12 @@ jobs:
 
     - name: Check ESLint configuration in settings.json
       run: |
-        if grep -q '"editor.defaultFormatter": "dbaeumer.vscode-eslint"' .vscode/settings.json && grep -q '"eslint.format.enable": true' .vscode/settings.json; then
-          echo "ESLint is set as the default formatter and format enable is true."
+        if grep -q '"editor.defaultFormatter": "dbaeumer.vscode-eslint"' .vscode/settings.json && grep -q '"eslint.format.enable": true' .vscode/settings.json && grep -q '"source.fixAll.eslint": "explicit"' .vscode/settings.json; then
+          echo "ESLint is set as the default formatter, format enable is true, and source.fixAll.eslint is explicit."
         else
           echo "Error: ESLint configuration in .vscode/settings.json is incorrect."
           exit 1
         fi
 
     - name: Run ESLint
-      run: npx eslint . --ext .js,.jsx,.ts,.tsx
+      run: npx eslint . --ext .js,.jsx,.ts,.tsx --max-warnings

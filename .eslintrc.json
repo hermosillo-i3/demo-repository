@@ -21,10 +21,11 @@
     "ecmaVersion": 2020
   },
   "rules": {
-    "linebreak-style": "off",
-    "semi": "off",
-    "camelcase": "off",
-    "require-jsdoc": "off",
+    "no-unused-vars": 1,
+    "linebreak-style": 0,
+    "semi": 0,
+    "camelcase": 0,
+    "require-jsdoc": 0,
     "indent": [
       "error",
       3,
@@ -32,8 +33,8 @@
         "SwitchCase": 1 
       }
     ],
-    "max-len": "off",
-    "valid-jsdoc": "off",
+    "max-len": 0,
+    "valid-jsdoc": 0,
     "new-cap": [
       "error",
       {

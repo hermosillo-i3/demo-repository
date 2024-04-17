@@ -44,27 +44,31 @@ const currencyObject = {
 
 function units(num) {
    switch (num) {
-   case 1:
-      return 'Un';
-   case 2:
-      return 'Dos';
-   case 3:
-      return 'Tres';
-   case 4:
-      return 'Cuatro';
-   case 5:
-      return 'Cinco';
-   case 6:
-      return 'Seis';
-   case 7:
-      return 'Siete';
-   case 8:
-      return 'Ocho';
-   case 9:
-      return 'Nueve';
-   default:
-      return '';
+      case 1:
+         return 'Un';
+      case 2:
+         return 'Dos';
+      case 3:
+         return 'Tres';
+      case 4:
+         return 'Cuatro';
+      case 5:
+         return 'Cinco';
+      case 6:
+         return 'Seis';
+      case 7:
+         return 'Siete';
+      case 8:
+         return 'Ocho';
+      case 9:
+         return 'Nueve';
+      default:
+         return '';
    }
+}
+
+function test(strSin, numUnidades) {
+   console.log('strSin: ', strSin);
 }
 
 function tensY(strSin, numUnidades) {
@@ -80,48 +84,48 @@ function tens(num) {
    const numUnidad = num - numDecena * 10;
 
    switch (numDecena) {
-   case 1:
-      switch (numUnidad) {
-      case 0:
-         return 'Diez';
       case 1:
-         return 'Once';
+         switch (numUnidad) {
+            case 0:
+               return 'Diez';
+            case 1:
+               return 'Once';
+            case 2:
+               return 'Doce';
+            case 3:
+               return 'Trece';
+            case 4:
+               return 'Catorce';
+            case 5:
+               return 'Quince';
+            default:
+               return 'Dieci' + units(numUnidad).toLowerCase();
+         }
       case 2:
-         return 'Doce';
+         switch (numUnidad) {
+            case 0:
+               return 'Veinte';
+            default:
+               return 'Veinti' + units(numUnidad).toLowerCase();
+         }
       case 3:
-         return 'Trece';
+         return tensY('Treinta', numUnidad);
       case 4:
-         return 'Catorce';
+         return tensY('Cuarenta', numUnidad);
       case 5:
-         return 'Quince';
-      default:
-         return 'Dieci' + units(numUnidad).toLowerCase();
-      }
-   case 2:
-      switch (numUnidad) {
+         return tensY('Cincuenta', numUnidad);
+      case 6:
+         return tensY('Sesenta', numUnidad);
+      case 7:
+         return tensY('Setenta', numUnidad);
+      case 8:
+         return tensY('Ochenta', numUnidad);
+      case 9:
+         return tensY('Noventa', numUnidad);
       case 0:
-         return 'Veinte';
+         return units(numUnidad);
       default:
-         return 'Veinti' + units(numUnidad).toLowerCase();
-      }
-   case 3:
-      return tensY('Treinta', numUnidad);
-   case 4:
-      return tensY('Cuarenta', numUnidad);
-   case 5:
-      return tensY('Cincuenta', numUnidad);
-   case 6:
-      return tensY('Sesenta', numUnidad);
-   case 7:
-      return tensY('Setenta', numUnidad);
-   case 8:
-      return tensY('Ochenta', numUnidad);
-   case 9:
-      return tensY('Noventa', numUnidad);
-   case 0:
-      return units(numUnidad);
-   default:
-      return '';
+         return '';
    }
 }
 
@@ -130,29 +134,29 @@ function hundreds(num) {
    const numDecenas = num - numCentenas * 100;
 
    switch (numCentenas) {
-   case 1:
-      if (numDecenas > 0) {
-         return 'Ciento ' + tens(numDecenas);
-      }
-      return 'Cien';
-   case 2:
-      return 'Doscientos ' + tens(numDecenas);
-   case 3:
-      return 'Trescientos ' + tens(numDecenas);
-   case 4:
-      return 'Cuatrocientos ' + tens(numDecenas);
-   case 5:
-      return 'Quinientos ' + tens(numDecenas);
-   case 6:
-      return 'Seiscientos ' + tens(numDecenas);
-   case 7:
-      return 'Setecientos ' + tens(numDecenas);
-   case 8:
-      return 'Ochocientos ' + tens(numDecenas);
-   case 9:
-      return 'Novecientos ' + tens(numDecenas);
-   default:
-      return tens(numDecenas);
+      case 1:
+         if (numDecenas > 0) {
+            return 'Ciento ' + tens(numDecenas);
+         }
+         return 'Cien';
+      case 2:
+         return 'Doscientos ' + tens(numDecenas);
+      case 3:
+         return 'Trescientos ' + tens(numDecenas);
+      case 4:
+         return 'Cuatrocientos ' + tens(numDecenas);
+      case 5:
+         return 'Quinientos ' + tens(numDecenas);
+      case 6:
+         return 'Seiscientos ' + tens(numDecenas);
+      case 7:
+         return 'Setecientos ' + tens(numDecenas);
+      case 8:
+         return 'Ochocientos ' + tens(numDecenas);
+      case 9:
+         return 'Novecientos ' + tens(numDecenas);
+      default:
+         return tens(numDecenas);
    }
 }
 
