@@ -1,0 +1,93 @@
+name: CI/CD
+
+on:
+   pull_request:
+     branches: [main, develop]
+     types: [opened] 
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      timestamp: ${{ steps.start.outputs.timestamp }}
+    steps:
+      - name: Set start timestamp
+        id: start
+        run: |
+          printf 'timestamp=%(%s)T\n' >> "$GITHUB_OUTPUT"
+  
+  post-on-slack:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [setup]
+    steps:
+      - name: Post to a Slack channel
+        if: always()
+        id: slack
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          # Slack channel id, channel name, or user id to post message.
+          # See also: https://api.slack.com/methods/chat.postMessage#channels
+          # You can pass in multiple channels to post to by providing a comma-delimited list of channel IDs.
+          channel-id: '${{ vars.SLACK_TEST_CHANNEL_ID }}'
+          # For posting a rich message using Block Kit
+          payload: |
+            {
+               "blocks": [
+                  {
+                     "type": "context",
+                     "elements": [
+                        {
+                           "type": "image",
+                           "image_url": "https://avatars.githubusercontent.com/u/${{github.actor_id}}?s=400&u=b81e946713a585cd4895227203a3d2ba5d5b3b46&v=4",
+                           "alt_text": "actor"
+                        },
+                        {
+                           "type": "mrkdwn",
+                           "text": "<https://github.com/${{github.actor}}|${{github.actor}}>"
+                        }
+                     ]
+                  },
+                  {
+                     "type": "section",
+                     "text": {
+                        "type": "mrkdwn",
+                        "text": "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Workflow # ${{ github.run_id }}>"
+                     }
+                  },
+                  {
+                     "type": "section",
+                     "fields": [
+                        {
+                           "type": "mrkdwn",
+                           "text": "*Repo*"
+                        },
+                        {
+                           "type": "mrkdwn",
+                           "text": "*Pull request*"
+                        },
+                        {
+                           "type": "mrkdwn",
+                           "text": "<https://github.com/${{ github.repository }}|${{steps.duration.outputs.repo_name}}>"
+                        },
+                        {
+                           "type": "mrkdwn",
+                           "text": "<${{ github.event.pull_request.html_url }}| Ver PR>"
+                        }
+                     ]
+                  },
+                  {
+                     "type": "section",
+                     "text": {
+                        "type": "mrkdwn",
+                        "text": "<@${{ vars.SLACK_USER_ID }}> Por favor, revisa este pull request :${{ vars.PLEASE_EMOJI }}:"
+                     }
+                  },
+                  {
+                     "type": "divider"
+                  }
+               ]
+            }
+            
+        env:
+          SLACK_BOT_TOKEN: ${{ vars.SLACK_BOT_TOKEN }}
