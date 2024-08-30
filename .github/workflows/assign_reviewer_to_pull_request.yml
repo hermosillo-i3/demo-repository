@@ -72,7 +72,7 @@ jobs:
                      "type": "section",
                      "text": {
                         "type": "mrkdwn",
-                        "text": "<@${{ vars.SLACK_USER_ID }}> Por favor, revisa este pull request :${{ vars.PLEASE_EMOJI }}:"
+                        "text": "<@${{ vars.SLACK_USER_ID }}>Por favor, revisa este pull request :${{ vars.PLEASE_EMOJI }}:"
                      }
                   },
                   {
