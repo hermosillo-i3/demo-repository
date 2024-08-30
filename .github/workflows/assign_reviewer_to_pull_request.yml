@@ -60,7 +60,15 @@ jobs:
                      "fields": [
                         {
                            "type": "mrkdwn",
+                           "text": "*Repo*"
+                        },
+                        {
+                           "type": "mrkdwn",
                            "text": "*Pull request*"
+                        },
+                        {
+                           "type": "mrkdwn",
+                           "text": "<https://github.com/${{ github.repository }}|${{steps.duration.outputs.repo_name}}>"
                         },
                         {
                            "type": "mrkdwn",
@@ -72,7 +80,7 @@ jobs:
                      "type": "section",
                      "text": {
                         "type": "mrkdwn",
-                        "text": "<@${{ vars.SLACK_USER_ID }}>Por favor, revisa este pull request :${{ vars.PLEASE_EMOJI }}:"
+                        "text": "<@${{ vars.SLACK_USER_ID }}> Por favor, revisa este pull request :${{ vars.PLEASE_EMOJI }}:"
                      }
                   },
                   {
