@@ -11,6 +11,7 @@ jobs:
     outputs:
       timestamp: ${{ steps.start.outputs.timestamp }}
       random-user: ${{ steps.select-user.outputs.random_user }}
+      random-emoji: ${{ steps.select-emoji.outputs.random_emoji }}
     steps:
       - name: Set start timestamp
         id: start
@@ -25,6 +26,8 @@ jobs:
           # Convert space-separated strings into arrays
           IFS=' ' read -r -a slack_users <<< "${{ vars.SLACK_USER_IDS }}"
           IFS=' ' read -r -a github_users <<< "${{ vars.GH_USERS }}"
+          IFS=' ' read -r -a github_users <<< "${{ vars.GH_USERS }}"
+
           
           # Initialize an array to hold filtered Slack users
           filtered_slack_users=()
@@ -43,6 +46,15 @@ jobs:
           else
             echo "No other users available for selection."
           fi
+
+      - name: Select a random emoji
+        id: select-emoji
+        run: |
+            echo "Selecting a random emoji..."
+            emojis=(${{ vars.SLACK_EMOJIS }})
+            random_emoji=${emojis[$((RANDOM % ${#emojis[@]}))]}
+            echo "random_emoji=$random_emoji" >> "$GITHUB_OUTPUT"
+
 
   post-on-slack:
     runs-on: ubuntu-latest
@@ -104,7 +116,7 @@ jobs:
                      "type": "section",
                      "text": {
                         "type": "mrkdwn",
-                        "text": "<@${{ needs.setup.outputs.random-user }}> Por favor, revisa este pull request :${{ vars.PLEASE_EMOJI }}:"
+                        "text": "<@${{ needs.setup.outputs.random-user }}> Por favor, revisa este pull request :${{ needs.setup.outputs.random-emoji }}:"
                      }
                   },
                   {
