@@ -26,8 +26,6 @@ jobs:
           # Convert space-separated strings into arrays
           IFS=' ' read -r -a slack_users <<< "${{ vars.SLACK_USER_IDS }}"
           IFS=' ' read -r -a github_users <<< "${{ vars.GH_USERS }}"
-          IFS=' ' read -r -a github_users <<< "${{ vars.GH_USERS }}"
-
           
           # Initialize an array to hold filtered Slack users
           filtered_slack_users=()
@@ -50,10 +48,10 @@ jobs:
       - name: Select a random emoji
         id: select-emoji
         run: |
-            echo "Selecting a random emoji..."
-            emojis=(${{ vars.SLACK_EMOJIS }})
-            random_emoji=${emojis[$((RANDOM % ${#emojis[@]}))]}
-            echo "random_emoji=$random_emoji" >> "$GITHUB_OUTPUT"
+          # Select a random emoji from vars.SLACK_EMOJIS
+          IFS=' ' read -r -a emojis <<< "${{ vars.SLACK_EMOJIS }}"
+          random_emoji=${emojis[$((RANDOM % ${#emojis[@]}))]}
+          echo "random_emoji=$random_emoji" >> "$GITHUB_OUTPUT"
 
 
   post-on-slack:
