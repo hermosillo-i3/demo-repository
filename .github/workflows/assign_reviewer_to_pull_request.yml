@@ -3,59 +3,46 @@ name: CI/CD
 on:
    pull_request:
      branches: [main, develop]
-     types: [opened, synchronize] 
+     types: [opened] 
 
 jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
       timestamp: ${{ steps.start.outputs.timestamp }}
-      selected-user: ${{ steps.select-user.outputs.selected_user }}
+      random-user: ${{ steps.select-user.outputs.random_user }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-
       - name: Set start timestamp
         id: start
         run: |
           printf 'timestamp=%(%s)T\n' >> "$GITHUB_OUTPUT"
       
-      - name: Select the user with the fewest PR assignments
+      - name: Select a random user
         id: select-user
         run: |
-         echo 'const fs = require("fs");' > select_user.js
-         echo 'const slackUsers = process.env.SLACK_USER_IDS.split(" ");' >> select_user.js
-         echo 'const githubUsers = process.env.GH_USERS.split(" ");' >> select_user.js
-         echo 'const currentActor = process.env.GITHUB_ACTOR;' >> select_user.js
-         echo 'const prAssignments = JSON.parse(fs.readFileSync("pr_assignments.json", "utf8"));' >> select_user.js
-         echo 'const assignmentCounts = prAssignments || {};' >> select_user.js
-         echo 'const filteredUsers = {};' >> select_user.js
-         echo 'githubUsers.forEach((githubUser, index) => {' >> select_user.js
-         echo '  if (githubUser !== currentActor) {' >> select_user.js
-         echo '    const slackUserId = slackUsers[index];' >> select_user.js
-         echo '    const prCount = assignmentCounts[slackUserId] || 0;' >> select_user.js
-         echo '    filteredUsers[slackUserId] = prCount;' >> select_user.js
-         echo '  }' >> select_user.js
-         echo '});' >> select_user.js
-         echo 'const sortedUsers = Object.keys(filteredUsers).sort((a, b) => filteredUsers[a] - filteredUsers[b]);' >> select_user.js
-         echo 'const selectedUser = sortedUsers[0];' >> select_user.js
-         echo 'assignmentCounts[selectedUser] = (assignmentCounts[selectedUser] || 0) + 1;' >> select_user.js
-         echo 'fs.writeFileSync("pr_assignments.json", JSON.stringify(assignmentCounts, null, 2));' >> select_user.js
-         echo 'console.log(`selected_user=${selectedUser}`);' >> select_user.js
-         node select_user.js > output.txt
-         selected_user=$(grep 'selected_user=' output.txt | cut -d '=' -f 2)
-         echo "selected_user=$selected_user" >> "$GITHUB_OUTPUT"
-
-      - name: Commit and push changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pr_assignments.json
-          git commit -m "Update PR assignments"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          echo "Filtering out the GitHub actor..."
+          
+          # Convert space-separated strings into arrays
+          IFS=' ' read -r -a slack_users <<< "${{ vars.SLACK_USER_IDS }}"
+          IFS=' ' read -r -a github_users <<< "${{ vars.GH_USERS }}"
+          
+          # Initialize an array to hold filtered Slack users
+          filtered_slack_users=()
+          
+          # Loop through the GitHub users array
+          for i in "${!github_users[@]}"; do
+            if [[ "${github_users[i]}" != "${{ github.actor }}" ]]; then
+              filtered_slack_users+=("${slack_users[i]}")
+            fi
+          done
+          
+          # Randomly select a Slack user from the filtered array
+          if [ ${#filtered_slack_users[@]} -gt 0 ]; then
+            random_user=${filtered_slack_users[$((RANDOM % ${#filtered_slack_users[@]}))]}
+            echo "random_user=$random_user" >> "$GITHUB_OUTPUT"
+          else
+            echo "No other users available for selection."
+          fi
 
   post-on-slack:
     runs-on: ubuntu-latest
@@ -117,21 +104,8 @@ jobs:
                      "type": "section",
                      "text": {
                         "type": "mrkdwn",
-                        "text": "<@${{ needs.setup.outputs.selected-user }}> Por favor, revisa este pull request :${{ vars.PLEASE_EMOJI }}:"
+                        "text": "<@${{ needs.setup.outputs.random-user }}> Por favor, revisa este pull request :${{ vars.PLEASE_EMOJI }}:"
                      }
-                  },
-                  {
-                     "type": "section",
-                     "fields": [
-                        {
-                           "type": "mrkdwn",
-                           "text": "*Número de PRs revisados:*"
-                        },
-                        {
-                           "type": "mrkdwn",
-                           "text": "${{ needs.setup.outputs.selected-user }}: ${assignment_counts[$selected_user]}"
-                        }
-                     ]
                   },
                   {
                      "type": "divider"
