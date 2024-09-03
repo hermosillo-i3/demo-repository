@@ -20,6 +20,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
+      - name: Check out the branch
+        run: |
+          git checkout ${{ github.ref_name }}
+
       - name: Select the user with the fewest PR assignments
         id: select-user
         run: |
