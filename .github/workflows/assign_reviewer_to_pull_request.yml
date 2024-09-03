@@ -52,13 +52,15 @@ jobs:
           current_count=${assignment_counts[$selected_user]:-0}
           assignment_counts[$selected_user]=$((current_count + 1))
           
-          json_data=$(jq -n --argjson counts "{}" '
+          # Convert the updated assignment_counts array to JSON
+          json_data=$(jq -n --argjson counts "$(printf '%s\n' "${!assignment_counts[@]}" | jq -R . | jq -s 'reduce .[] as $item ({}; .[$item] = $ENV[$item])')" '
             . as $empty |
             $counts | to_entries |
             reduce .[] as $item ($empty; . + {($item.key): ($item.value | tonumber)})
           ')
           
-          jq -n --argjson data "$json_data" '$data' > pr_assignments.json
+          # Write the JSON data back to pr_assignments.json
+          echo "$json_data" > pr_assignments.json
 
           echo "selected_user=$selected_user" >> "$GITHUB_OUTPUT"
 
