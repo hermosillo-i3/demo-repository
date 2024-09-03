@@ -60,6 +60,8 @@ jobs:
           
           jq -n --argjson data "$json_data" '$data' > pr_assignments.json
 
+         echo "selected_user=$selected_user" >> "$GITHUB_OUTPUT"
+
       - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
@@ -67,7 +69,6 @@ jobs:
           git add pr_assignments.json
           git commit -m "Update PR assignments"
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
-          echo "selected_user=$selected_user" >> "$GITHUB_OUTPUT"
 
   post-on-slack:
     runs-on: ubuntu-latest
