@@ -60,7 +60,7 @@ jobs:
           
           jq -n --argjson data "$json_data" '$data' > pr_assignments.json
 
-         echo "selected_user=$selected_user" >> "$GITHUB_OUTPUT"
+          echo "selected_user=$selected_user" >> "$GITHUB_OUTPUT"
 
       - name: Commit and push changes
         run: |
