@@ -26,41 +26,40 @@ jobs:
       - name: Select the user with the fewest PR assignments
         id: select-user
         run: |
-          IFS=' ' read -r -a slack_users <<< "${{ vars.SLACK_USER_IDS }}"
-          IFS=' ' read -r -a github_users <<< "${{ vars.GH_USERS }}"
-          
-          pr_assignments=$(cat pr_assignments.json)
-          
-          declare -A assignment_counts
-          while IFS="=" read -r key value; do
-            assignment_counts[$key]=$value
-          done < <(echo "$pr_assignments" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
-          
-          declare -A filtered_users
-          for i in "${!github_users[@]}"; do
-            if [[ "${github_users[i]}" != "${{ github.actor }}" ]]; then
-              slack_user_id="${slack_users[i]}"
-              pr_count=${assignment_counts[$slack_user_id]:-0}
-              filtered_users[$slack_user_id]=$pr_count
-            fi
-          done
-          
-          sorted_users=($(for key in "${!filtered_users[@]}"; do echo "$key:${filtered_users[$key]}"; done | sort -t':' -k2,2n | cut -d':' -f1))
-          
-          selected_user="${sorted_users[0]}"
-          
-          current_count=${assignment_counts[$selected_user]:-0}
-          assignment_counts[$selected_user]=$((current_count + 1))
-          
-          # Convert the updated assignment_counts array to JSON
-          json_data=$(jq -n --argjson counts "$(printf '%s\n' "${!assignment_counts[@]}" | jq -R . | jq -s 'reduce .[] as $item ({}; .[$item] = $ENV[$item])')" '
-            . as $empty |
-            $counts | to_entries |
-            reduce .[] as $item ($empty; . + {($item.key): ($item.value | tonumber)})
-          ')
-          
-          # Write the JSON data back to pr_assignments.json
-          echo "$json_data" > pr_assignments.json
+         const fs = require('fs');
+
+         // Read environment variables
+         const slackUsers = process.env.SLACK_USER_IDS.split(' ');
+         const githubUsers = process.env.GH_USERS.split(' ');
+         const currentActor = process.env.GITHUB_ACTOR;
+
+         // Read and parse pr_assignments.json
+         const prAssignments = JSON.parse(fs.readFileSync('pr_assignments.json', 'utf8'));
+
+         // Initialize assignmentCounts from prAssignments
+         const assignmentCounts = prAssignments || {};
+
+         // Filter out the current GitHub actor from the list of GitHub users
+         const filteredUsers = {};
+         githubUsers.forEach((githubUser, index) => {
+         if (githubUser !== currentActor) {
+            const slackUserId = slackUsers[index];
+            const prCount = assignmentCounts[slackUserId] || 0;
+            filteredUsers[slackUserId] = prCount;
+         }
+         });
+
+         // Sort the filteredUsers by PR count
+         const sortedUsers = Object.keys(filteredUsers).sort((a, b) => filteredUsers[a] - filteredUsers[b]);
+
+         // Select the user with the fewest PR assignments
+         const selectedUser = sortedUsers[0];
+
+         // Update the count for the selected user
+         assignmentCounts[selectedUser] = (assignmentCounts[selectedUser] || 0) + 1;
+
+         // Write the updated assignmentCounts back to pr_assignments.json
+         fs.writeFileSync('pr_assignments.json', JSON.stringify(assignmentCounts, null, 2));
 
           echo "selected_user=$selected_user" >> "$GITHUB_OUTPUT"
 
