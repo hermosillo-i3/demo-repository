@@ -3,7 +3,7 @@ name: CI/CD
 on:
    pull_request:
      branches: [main, develop]
-     types: [opened, synchronize] 
+     types: [opened] 
 
 jobs:
   setup:
@@ -12,35 +12,30 @@ jobs:
       timestamp: ${{ steps.start.outputs.timestamp }}
       selected-user: ${{ steps.select-user.outputs.selected_user }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
       - name: Set start timestamp
         id: start
         run: |
           printf 'timestamp=%(%s)T\n' >> "$GITHUB_OUTPUT"
-      
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Check out the branch
-        run: |
-          git checkout ${{ github.ref_name }}
 
       - name: Select the user with the fewest PR assignments
         id: select-user
         run: |
-          # Convert space-separated strings into arrays
           IFS=' ' read -r -a slack_users <<< "${{ vars.SLACK_USER_IDS }}"
           IFS=' ' read -r -a github_users <<< "${{ vars.GH_USERS }}"
           
-          # Read current PR assignment data from the JSON file
           pr_assignments=$(cat pr_assignments.json)
           
-          # Convert JSON to a bash associative array
           declare -A assignment_counts
           while IFS="=" read -r key value; do
             assignment_counts[$key]=$value
           done < <(echo "$pr_assignments" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
           
-          # Filter out the GitHub actor and sort by PR count
           declare -A filtered_users
           for i in "${!github_users[@]}"; do
             if [[ "${github_users[i]}" != "${{ github.actor }}" ]]; then
@@ -50,32 +45,28 @@ jobs:
             fi
           done
           
-          # Sort the users by their PR count and select the first one
           sorted_users=($(for key in "${!filtered_users[@]}"; do echo "$key:${filtered_users[$key]}"; done | sort -t':' -k2,2n | cut -d':' -f1))
           
           selected_user="${sorted_users[0]}"
           
-          # Update the selected user's PR count
           current_count=${assignment_counts[$selected_user]:-0}
           assignment_counts[$selected_user]=$((current_count + 1))
           
-          # Convert the assignment_counts associative array back into JSON
-            json_data=$(jq -n --argjson counts "{}" '
+          json_data=$(jq -n --argjson counts "{}" '
             . as $empty |
             $counts | to_entries |
             reduce .[] as $item ($empty; . + {($item.key): ($item.value | tonumber)})
-            ')
-
-            # Use the generated JSON in jq
-            jq -n --argjson data "$json_data" '$data' > pr_assignments.json
+          ')
           
-          # Commit the changes
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          jq -n --argjson data "$json_data" '$data' > pr_assignments.json
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add pr_assignments.json
           git commit -m "Update PR assignments"
-          git push origin ${{ github.ref_name }}
- 
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
           echo "selected_user=$selected_user" >> "$GITHUB_OUTPUT"
 
   post-on-slack:
