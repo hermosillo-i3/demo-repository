@@ -22,46 +22,32 @@ jobs:
         id: start
         run: |
           printf 'timestamp=%(%s)T\n' >> "$GITHUB_OUTPUT"
-
+      
       - name: Select the user with the fewest PR assignments
         id: select-user
         run: |
-         const fs = require('fs');
-
-         // Read environment variables
-         const slackUsers = process.env.SLACK_USER_IDS.split(' ');
-         const githubUsers = process.env.GH_USERS.split(' ');
-         const currentActor = process.env.GITHUB_ACTOR;
-
-         // Read and parse pr_assignments.json
-         const prAssignments = JSON.parse(fs.readFileSync('pr_assignments.json', 'utf8'));
-
-         // Initialize assignmentCounts from prAssignments
-         const assignmentCounts = prAssignments || {};
-
-         // Filter out the current GitHub actor from the list of GitHub users
-         const filteredUsers = {};
-         githubUsers.forEach((githubUser, index) => {
-         if (githubUser !== currentActor) {
-            const slackUserId = slackUsers[index];
-            const prCount = assignmentCounts[slackUserId] || 0;
-            filteredUsers[slackUserId] = prCount;
-         }
-         });
-
-         // Sort the filteredUsers by PR count
-         const sortedUsers = Object.keys(filteredUsers).sort((a, b) => filteredUsers[a] - filteredUsers[b]);
-
-         // Select the user with the fewest PR assignments
-         const selectedUser = sortedUsers[0];
-
-         // Update the count for the selected user
-         assignmentCounts[selectedUser] = (assignmentCounts[selectedUser] || 0) + 1;
-
-         // Write the updated assignmentCounts back to pr_assignments.json
-         fs.writeFileSync('pr_assignments.json', JSON.stringify(assignmentCounts, null, 2));
-
-          echo "selected_user=$selected_user" >> "$GITHUB_OUTPUT"
+         echo 'const fs = require("fs");' > select_user.js
+         echo 'const slackUsers = process.env.SLACK_USER_IDS.split(" ");' >> select_user.js
+         echo 'const githubUsers = process.env.GH_USERS.split(" ");' >> select_user.js
+         echo 'const currentActor = process.env.GITHUB_ACTOR;' >> select_user.js
+         echo 'const prAssignments = JSON.parse(fs.readFileSync("pr_assignments.json", "utf8"));' >> select_user.js
+         echo 'const assignmentCounts = prAssignments || {};' >> select_user.js
+         echo 'const filteredUsers = {};' >> select_user.js
+         echo 'githubUsers.forEach((githubUser, index) => {' >> select_user.js
+         echo '  if (githubUser !== currentActor) {' >> select_user.js
+         echo '    const slackUserId = slackUsers[index];' >> select_user.js
+         echo '    const prCount = assignmentCounts[slackUserId] || 0;' >> select_user.js
+         echo '    filteredUsers[slackUserId] = prCount;' >> select_user.js
+         echo '  }' >> select_user.js
+         echo '});' >> select_user.js
+         echo 'const sortedUsers = Object.keys(filteredUsers).sort((a, b) => filteredUsers[a] - filteredUsers[b]);' >> select_user.js
+         echo 'const selectedUser = sortedUsers[0];' >> select_user.js
+         echo 'assignmentCounts[selectedUser] = (assignmentCounts[selectedUser] || 0) + 1;' >> select_user.js
+         echo 'fs.writeFileSync("pr_assignments.json", JSON.stringify(assignmentCounts, null, 2));' >> select_user.js
+         echo 'console.log(`selected_user=${selectedUser}`);' >> select_user.js
+         node select_user.js > output.txt
+         selected_user=$(grep 'selected_user=' output.txt | cut -d '=' -f 2)
+         echo "selected_user=$selected_user" >> "$GITHUB_OUTPUT"
 
       - name: Commit and push changes
         run: |
