@@ -55,8 +55,15 @@ jobs:
           current_count=${assignment_counts[$selected_user]:-0}
           assignment_counts[$selected_user]=$((current_count + 1))
           
-          # Write the updated assignments back to the JSON file
-          jq -n --argjson data "$(printf '%s\n' "${assignment_counts[@]}" | jq -R 'split("\n")[:-1] | map(split("=")) | from_entries')" '$data' > pr_assignments.json
+          # Convert the assignment_counts associative array back into JSON
+            json_data=$(jq -n --argjson counts "{}" '
+            . as $empty |
+            $counts | to_entries |
+            reduce .[] as $item ($empty; . + {($item.key): ($item.value | tonumber)})
+            ')
+
+            # Use the generated JSON in jq
+            jq -n --argjson data "$json_data" '$data' > pr_assignments.json
           
           # Commit the changes
           git config --global user.name "github-actions[bot]"
