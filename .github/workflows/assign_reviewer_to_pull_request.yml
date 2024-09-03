@@ -135,7 +135,7 @@ jobs:
                      "fields": [
                         {
                            "type": "mrkdwn",
-                           "text": "*Número de PRs asignados:*"
+                           "text": "*Número de PRs revisados:*"
                         },
                         {
                            "type": "mrkdwn",
