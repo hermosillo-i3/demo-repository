@@ -24,22 +24,24 @@ jobs:
             # Load the JSON data from the GitHub Actions variable or secret
             user_map='${{ vars.REVIEWERS }}'
   
-            # Get the GitHub actor (author of the PR)
+             # Get the GitHub actor (author of the PR)
             pr_author="${{ github.actor }}"
-  
-            # Filter out the GitHub actor from the user map
+
+            # Parse JSON and filter out the PR author
             filtered_users=$(echo $user_map | jq 'del(."'"$pr_author"'")')
-  
+
+            # Check if there are any users left after filtering
+            if [ "$(echo $filtered_users | jq '. | length')" -eq 0 ]; then
+               echo "No other users available for selection."
+               exit 1
+            fi
+
             # Extract the Slack IDs into an array
             slack_ids=($(echo $filtered_users | jq -r 'to_entries[] | .value'))
-  
+
             # Randomly select a Slack user from the filtered array
-            if [ ${#slack_ids[@]} -gt 0 ]; then
-              random_user=${slack_ids[$((RANDOM % ${#slack_ids[@]}))]}
-              echo "random_user=$random_user" >> "$GITHUB_OUTPUT"
-            else
-              echo "No other users available for selection."
-            fi
+            random_user=${slack_ids[$((RANDOM % ${#slack_ids[@]}))]}
+            echo "random_user=$random_user" >> "$GITHUB_OUTPUT"
 
       - name: Select a random emoji
         id: select-emoji
