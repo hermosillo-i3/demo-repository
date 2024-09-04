@@ -36,8 +36,12 @@ jobs:
                exit 1
             fi
 
+            echo filtered_users
+
             # Extract the Slack IDs into an array
             slack_ids=($(echo $filtered_users | jq -r 'to_entries[] | .value'))
+
+            echo slack_ids
 
             # Randomly select a Slack user from the filtered array
             random_user=${slack_ids[$((RANDOM % ${#slack_ids[@]}))]}
