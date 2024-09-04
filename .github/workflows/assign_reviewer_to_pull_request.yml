@@ -18,32 +18,28 @@ jobs:
         run: |
           printf 'timestamp=%(%s)T\n' >> "$GITHUB_OUTPUT"
       
-      - name: Select a random user
+      - name: Load user mapping and select a random user
         id: select-user
         run: |
-          echo "Filtering out the GitHub actor..."
-          
-          # Convert space-separated strings into arrays
-          IFS=' ' read -r -a slack_users <<< "${{ vars.SLACK_USER_IDS }}"
-          IFS=' ' read -r -a github_users <<< "${{ vars.GH_USERS }}"
-          
-          # Initialize an array to hold filtered Slack users
-          filtered_slack_users=()
-          
-          # Loop through the GitHub users array
-          for i in "${!github_users[@]}"; do
-            if [[ "${github_users[i]}" != "${{ github.actor }}" ]]; then
-              filtered_slack_users+=("${slack_users[i]}")
+            # Load the JSON data from the GitHub Actions variable or secret
+            user_map='${{ vars.REVIEWERS }}'
+  
+            # Get the GitHub actor (author of the PR)
+            pr_author="${{ github.actor }}"
+  
+            # Filter out the GitHub actor from the user map
+            filtered_users=$(echo $user_map | jq 'del(."'"$pr_author"'")')
+  
+            # Extract the Slack IDs into an array
+            slack_ids=($(echo $filtered_users | jq -r 'to_entries[] | .value'))
+  
+            # Randomly select a Slack user from the filtered array
+            if [ ${#slack_ids[@]} -gt 0 ]; then
+              random_user=${slack_ids[$((RANDOM % ${#slack_ids[@]}))]}
+              echo "random_user=$random_user" >> "$GITHUB_OUTPUT"
+            else
+              echo "No other users available for selection."
             fi
-          done
-          
-          # Randomly select a Slack user from the filtered array
-          if [ ${#filtered_slack_users[@]} -gt 0 ]; then
-            random_user=${filtered_slack_users[$((RANDOM % ${#filtered_slack_users[@]}))]}
-            echo "random_user=$random_user" >> "$GITHUB_OUTPUT"
-          else
-            echo "No other users available for selection."
-          fi
 
       - name: Select a random emoji
         id: select-emoji
