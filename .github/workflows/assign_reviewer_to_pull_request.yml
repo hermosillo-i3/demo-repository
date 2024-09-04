@@ -9,16 +9,10 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      timestamp: ${{ steps.start.outputs.timestamp }}
       random-user: ${{ steps.select-user.outputs.random_user }}
       random-emoji: ${{ steps.select-emoji.outputs.random_emoji }}
-    steps:
-      - name: Set start timestamp
-        id: start
-        run: |
-          printf 'timestamp=%(%s)T\n' >> "$GITHUB_OUTPUT"
-      
-      - name: Load user mapping and select a random user
+    steps:      
+      - name: Load reviewers and select a random one excluding the PR author
         id: select-user
         run: |
             # Load the JSON data from the GitHub Actions variable or secret
@@ -36,12 +30,8 @@ jobs:
                exit 1
             fi
 
-            echo filtered_users
-
             # Extract the Slack IDs into an array
             slack_ids=($(echo $filtered_users | jq -r 'to_entries[] | .value'))
-
-            echo slack_ids
 
             # Randomly select a Slack user from the filtered array
             random_user=${slack_ids[$((RANDOM % ${#slack_ids[@]}))]}
