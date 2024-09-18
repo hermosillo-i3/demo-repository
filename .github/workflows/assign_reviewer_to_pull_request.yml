@@ -11,7 +11,6 @@ jobs:
     outputs:
       random-user: ${{ steps.select-user.outputs.random_user }}
       random-emoji: ${{ steps.select-emoji.outputs.random_emoji }}
-      target-branch: ${{ github.event.pull_request.base.ref }}
       pr-author: ${{ steps.select-author.outputs.pr_author }}
     steps:      
       - name: Load reviewers and select a random one excluding the PR author
@@ -22,7 +21,6 @@ jobs:
   
             # Get the GitHub actor (author of the PR)
             pr_author="${{ github.actor }}"
-            echo "pr_author=$pr_author" >> "$GITHUB_OUTPUT"
 
             # Parse JSON and filter out the PR author
             filtered_users=$(echo $user_map | jq 'del(."'"$pr_author"'")')
@@ -39,6 +37,10 @@ jobs:
             # Randomly select a Slack user from the filtered array
             random_user=${slack_ids[$((RANDOM % ${#slack_ids[@]}))]}
             echo "random_user=$random_user" >> "$GITHUB_OUTPUT"
+
+            # Extract the PR author's Slack ID from the JSON
+            pr_author_slack=$(echo $user_map | jq -r '."'${pr_author}'"')
+            echo "pr_author_slack=$pr_author_slack" >> "$GITHUB_OUTPUT"
 
       - name: Select a random emoji
         id: select-emoji
@@ -117,7 +119,7 @@ jobs:
                         },
                         {
                            "type": "mrkdwn",
-                           "text": "${{ needs.setup.outputs.target-branch }}"
+                           "text": "<https://github.com/${{ github.repository }}/tree/${{ github.event.pull_request.head.ref }}|${{ github.event.pull_request.head.ref }}>"
                         },
                         {
                            "type": "mrkdwn",
