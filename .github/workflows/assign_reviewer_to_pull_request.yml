@@ -11,7 +11,7 @@ jobs:
     outputs:
       random-user: ${{ steps.select-user.outputs.random_user }}
       random-emoji: ${{ steps.select-emoji.outputs.random_emoji }}
-      pr-author: ${{ steps.select-author.outputs.pr_author }}
+      pr-author-slack: ${{ steps.select-author.outputs.pr_author_slack }}
 
     steps:      
       - name: Load reviewers and select a random one excluding the PR author
@@ -50,10 +50,15 @@ jobs:
       - name: Get PR author
         id: select-author
         run: |
-          # Extract the PR author's Slack ID from the JSON
+          # Load the JSON data from the GitHub Actions variable or secret
+          user_map='${{ vars.REVIEWERS }}'
+  
+          # Get the GitHub actor (author of the PR)
           pr_author="${{ github.actor }}"
-          pr_author=$(echo $user_map | jq -r '."'${pr_author}'"')
-          echo "pr_author=$pr_author" >> "$GITHUB_OUTPUT"
+
+          # Extract the PR author's Slack ID from the JSON
+          pr_author_slack=$(echo $user_map | jq -r '."'${pr_author}'"')
+          echo "pr_author_slack=$pr_author_slack" >> "$GITHUB_OUTPUT"
 
   post-on-slack:
     runs-on: ubuntu-latest
@@ -128,7 +133,7 @@ jobs:
                         },
                         {
                            "type": "mrkdwn",
-                           "text": "<@${{ needs.setup.outputs.pr-author }}>"
+                           "text": "<@${{ needs.setup.outputs.pr-author-slack }}>"
                         }
                      ]
                   },
