@@ -11,7 +11,7 @@ jobs:
     outputs:
       random-user: ${{ steps.select-user.outputs.random_user }}
       random-emoji: ${{ steps.select-emoji.outputs.random_emoji }}
-      base-branch: ${{ github.event.pull_request.base.ref }}
+      target-branch: ${{ github.event.pull_request.base.ref }}
       pr-author: ${{ steps.select-author.outputs.pr_author }}
     steps:      
       - name: Load reviewers and select a random one excluding the PR author
@@ -109,7 +109,7 @@ jobs:
                      "fields": [
                         {
                            "type": "mrkdwn",
-                           "text": "*Base Branch*"
+                           "text": "*Target Branch*"
                         },
                         {
                            "type": "mrkdwn",
@@ -117,7 +117,7 @@ jobs:
                         },
                         {
                            "type": "mrkdwn",
-                           "text": "${{ needs.setup.outputs.base-branch }}"
+                           "text": "${{ needs.setup.outputs.target-branch }}"
                         },
                         {
                            "type": "mrkdwn",
