@@ -11,7 +11,8 @@ jobs:
     outputs:
       random-user: ${{ steps.select-user.outputs.random_user }}
       random-emoji: ${{ steps.select-emoji.outputs.random_emoji }}
-      pr-author-slack: ${{ steps.select-user.outputs.pr_author_slack }}
+      base-branch: ${{ github.event.pull_request.base.ref }}
+      pr-author: ${{ steps.select-author.outputs.pr_author }}
     steps:      
       - name: Load reviewers and select a random one excluding the PR author
         id: select-user
@@ -21,6 +22,7 @@ jobs:
   
             # Get the GitHub actor (author of the PR)
             pr_author="${{ github.actor }}"
+            echo "pr_author=$pr_author" >> "$GITHUB_OUTPUT"
 
             # Parse JSON and filter out the PR author
             filtered_users=$(echo $user_map | jq 'del(."'"$pr_author"'")')
@@ -38,10 +40,6 @@ jobs:
             random_user=${slack_ids[$((RANDOM % ${#slack_ids[@]}))]}
             echo "random_user=$random_user" >> "$GITHUB_OUTPUT"
 
-            # Extract the PR author's Slack ID from the JSON
-            pr_author_slack=$(echo $user_map | jq -r '."'${pr_author}'"')
-            echo "pr_author_slack=$pr_author_slack" >> "$GITHUB_OUTPUT"
-
       - name: Select a random emoji
         id: select-emoji
         run: |
@@ -49,7 +47,6 @@ jobs:
           IFS=' ' read -r -a emojis <<< "${{ vars.SLACK_EMOJIS }}"
           random_emoji=${emojis[$((RANDOM % ${#emojis[@]}))]}
           echo "random_emoji=$random_emoji" >> "$GITHUB_OUTPUT"
-
 
   post-on-slack:
     runs-on: ubuntu-latest
@@ -112,11 +109,19 @@ jobs:
                      "fields": [
                         {
                            "type": "mrkdwn",
-                           "text": "*Base branch*"
+                           "text": "*Base Branch*"
                         },
                         {
                            "type": "mrkdwn",
-                           "text": "${{ github.event.pull_request.base.ref }}"
+                           "text": "*PR Author*"
+                        },
+                        {
+                           "type": "mrkdwn",
+                           "text": "${{ needs.setup.outputs.base-branch }}"
+                        },
+                        {
+                           "type": "mrkdwn",
+                           "text": "<@${{ needs.setup.outputs.pr-author }}>"
                         }
                      ]
                   },
@@ -125,13 +130,6 @@ jobs:
                      "text": {
                         "type": "mrkdwn",
                         "text": "<@${{ needs.setup.outputs.random-user }}> Por favor, revisa este pull request :${{ needs.setup.outputs.random-emoji }}:"
-                     }
-                  },
-                  {
-                     "type": "section",
-                     "text": {
-                        "type": "mrkdwn",
-                        "text": "Autor del PR: <@${{ needs.setup.outputs.pr-author-slack }}>"
                      }
                   },
                   {
