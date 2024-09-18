@@ -11,6 +11,7 @@ jobs:
     outputs:
       random-user: ${{ steps.select-user.outputs.random_user }}
       random-emoji: ${{ steps.select-emoji.outputs.random_emoji }}
+      pr-author-slack: ${{ steps.select-user.outputs.pr_author_slack }}
     steps:      
       - name: Load reviewers and select a random one excluding the PR author
         id: select-user
@@ -18,7 +19,7 @@ jobs:
             # Load the JSON data from the GitHub Actions variable or secret
             user_map='${{ vars.REVIEWERS }}'
   
-             # Get the GitHub actor (author of the PR)
+            # Get the GitHub actor (author of the PR)
             pr_author="${{ github.actor }}"
 
             # Parse JSON and filter out the PR author
@@ -36,6 +37,10 @@ jobs:
             # Randomly select a Slack user from the filtered array
             random_user=${slack_ids[$((RANDOM % ${#slack_ids[@]}))]}
             echo "random_user=$random_user" >> "$GITHUB_OUTPUT"
+
+            # Extract the PR author's Slack ID from the JSON
+            pr_author_slack=$(echo $user_map | jq -r '."'${pr_author}'"')
+            echo "pr_author_slack=$pr_author_slack" >> "$GITHUB_OUTPUT"
 
       - name: Select a random emoji
         id: select-emoji
@@ -104,9 +109,29 @@ jobs:
                   },
                   {
                      "type": "section",
+                     "fields": [
+                        {
+                           "type": "mrkdwn",
+                           "text": "*Base branch*"
+                        },
+                        {
+                           "type": "mrkdwn",
+                           "text": "${{ github.event.pull_request.base.ref }}"
+                        }
+                     ]
+                  },
+                  {
+                     "type": "section",
                      "text": {
                         "type": "mrkdwn",
                         "text": "<@${{ needs.setup.outputs.random-user }}> Por favor, revisa este pull request :${{ needs.setup.outputs.random-emoji }}:"
+                     }
+                  },
+                  {
+                     "type": "section",
+                     "text": {
+                        "type": "mrkdwn",
+                        "text": "Autor del PR: <@${{ needs.setup.outputs.pr-author-slack }}>"
                      }
                   },
                   {
