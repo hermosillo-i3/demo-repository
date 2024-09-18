@@ -50,9 +50,10 @@ jobs:
       - name: Get PR author
         id: select-author
         run: |
-         # Extract the PR author's Slack ID from the JSON
-         pr_author=$(echo $user_map | jq -r '."'${pr_author}'"')
-         echo "pr_author=$pr_author" >> "$GITHUB_OUTPUT"
+          # Extract the PR author's Slack ID from the JSON
+          pr_author="${{ github.actor }}"
+          pr_author=$(echo $user_map | jq -r '."'${pr_author}'"')
+          echo "pr_author=$pr_author" >> "$GITHUB_OUTPUT"
 
   post-on-slack:
     runs-on: ubuntu-latest
