@@ -1,9 +1,13 @@
-name: CI/CD
+name: Assign a reviewer for the PR and post it on slack
 
 on:
    pull_request:
      branches: [main, develop]
-     types: [opened, synchronize]
+     types: [opened]
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   setup:
@@ -12,10 +16,13 @@ jobs:
       random-user: ${{ steps.select-user.outputs.random_user }}
       random-emoji: ${{ steps.select-emoji.outputs.random_emoji }}
       pr-author-slack: ${{ steps.select-author.outputs.pr_author_slack }}
+      github-reviewer: ${{ steps.select-user.outputs.github_reviewer }}
 
-    steps:      
-      - name: Load reviewers and select a random one excluding the PR author
+    steps:
+      - name: Load reviewers and select the one with least workload excluding the PR author
         id: select-user
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
             # Load the JSON data from the GitHub Actions variable or secret
             user_map='${{ vars.REVIEWERS }}'
@@ -32,12 +39,39 @@ jobs:
                exit 1
             fi
 
-            # Extract the Slack IDs into an array
-            slack_ids=($(echo $filtered_users | jq -r 'to_entries[] | .value'))
-
-            # Randomly select a Slack user from the filtered array
-            random_user=${slack_ids[$((RANDOM % ${#slack_ids[@]}))]}
-            echo "random_user=$random_user" >> "$GITHUB_OUTPUT"
+            # Get all GitHub usernames (keys) from the filtered map
+            github_users=($(echo $filtered_users | jq -r 'keys[]'))
+            
+            # Initialize variables to track the user with minimum workload
+            min_workload=999999
+            selected_github_user=""
+            selected_slack_user=""
+            
+            echo "Checking workload for each potential reviewer..."
+            
+            # For each potential reviewer, count their current open PR reviews
+            for github_user in "${github_users[@]}"; do
+              echo "Checking workload for: $github_user"
+              
+              # Get count of open PRs where this user is a requested reviewer
+              workload=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+                "https://api.github.com/search/issues?q=repo:${{ github.repository }}+type:pr+state:open+review-requested:$github_user" \
+                | jq '.total_count')
+              
+              echo "User $github_user has $workload open PR reviews"
+              
+              # Check if this user has the minimum workload so far
+              if [ "$workload" -lt "$min_workload" ]; then
+                min_workload=$workload
+                selected_github_user=$github_user
+                selected_slack_user=$(echo $filtered_users | jq -r '."'$github_user'"')
+              fi
+            done
+            
+            echo "Selected reviewer: $selected_github_user (Slack: $selected_slack_user) with $min_workload open reviews"
+            
+            echo "random_user=$selected_slack_user" >> "$GITHUB_OUTPUT"
+            echo "github_reviewer=$selected_github_user" >> "$GITHUB_OUTPUT"
 
       - name: Select a random emoji
         id: select-emoji
@@ -47,11 +81,11 @@ jobs:
           random_emoji=${emojis[$((RANDOM % ${#emojis[@]}))]}
           echo "random_emoji=$random_emoji" >> "$GITHUB_OUTPUT"
       
-      - name: Get PR author
+      - name: Get PR author Slack user
         id: select-author
         run: |
           # Load the JSON data from the GitHub Actions variable or secret
-          user_map='${{ vars.REVIEWERS }}'
+          user_map='${{ vars.AUTHORS }}'
   
           # Get the GitHub actor (author of the PR)
           pr_author="${{ github.actor }}"
@@ -60,10 +94,57 @@ jobs:
           pr_author_slack=$(echo $user_map | jq -r '."'${pr_author}'"')
           echo "pr_author_slack=$pr_author_slack" >> "$GITHUB_OUTPUT"
 
+  assign-reviewer:
+    runs-on: ubuntu-latest
+    needs: [setup]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Assign reviewer to PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEWER: ${{ needs.setup.outputs.github-reviewer }}
+        run: |
+          echo "Asignando reviewer: $REVIEWER al PR #$PR_NUMBER"
+          
+          # Verificar que tenemos los datos necesarios
+          if [ -z "$REVIEWER" ]; then
+            echo "❌ Error: No se pudo seleccionar un reviewer"
+            exit 1
+          fi
+          
+          # Asignar reviewer usando GitHub CLI (más confiable que curl)
+          gh pr edit $PR_NUMBER --add-reviewer "$REVIEWER" || {
+            echo "❌ Error asignando reviewer con gh cli, intentando con curl..."
+            
+            # Fallback con curl mejorado
+            response=$(curl -s -w "%{http_code}" -X POST \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUMBER/requested_reviewers" \
+              -d "{\"reviewers\":[\"$REVIEWER\"]}")
+              
+            http_code="${response: -3}"
+            response_body="${response%???}"
+            
+            if [ "$http_code" -eq 201 ]; then
+              echo "✅ Reviewer asignado exitosamente via API"
+            else
+              echo "❌ Error HTTP $http_code al asignar reviewer:"
+              echo "$response_body"
+              exit 1
+            fi
+          }
+          
+          echo "✅ Reviewer $REVIEWER asignado exitosamente al PR #$PR_NUMBER"
+
   post-on-slack:
     runs-on: ubuntu-latest
     if: always()
-    needs: [setup]
+    needs: [setup, assign-reviewer]
     steps:
       - name: Post to a Slack channel
         if: always()
