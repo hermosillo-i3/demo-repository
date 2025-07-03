@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       github-reviewer: ${{ steps.select-user.outputs.github_reviewer }}
-      slack-reviewer: ${{ steps.select-author.outputs.slack-reviewer }}
+      slack-reviewer: ${{ steps.select-author.outputs.slack_reviewer }}
       random-emoji: ${{ steps.select-emoji.outputs.random_emoji }}
       pr-author-slack: ${{ steps.select-author.outputs.pr_author_slack }}
 
@@ -76,6 +76,8 @@ jobs:
             
             echo "Selected reviewer: $selected_github_user (Slack: $selected_slack_user) with $min_workload open reviews"
             
+            github_reviewer=$selected_github_user
+            slack_reviewer=$selected_slack_user
             echo "random_user=$selected_slack_user" >> "$GITHUB_OUTPUT"
             echo "github_reviewer=$selected_github_user" >> "$GITHUB_OUTPUT"
 
@@ -87,7 +89,7 @@ jobs:
           random_emoji=${emojis[$((RANDOM % ${#emojis[@]}))]}
           echo "random_emoji=$random_emoji" >> "$GITHUB_OUTPUT"
       
-      - name: Get PR author and reviewer Slack user
+      - name: Get PR author
         id: select-author
         run: |
           # Load the JSON data from the GitHub Actions variable or secret
@@ -99,10 +101,6 @@ jobs:
           # Extract the PR author's Slack ID from the JSON
           pr_author_slack=$(echo $user_map | jq -r '."'${pr_author}'"')
           echo "pr_author_slack=$pr_author_slack" >> "$GITHUB_OUTPUT"
-
-          # Get the reviewer Slack user on reviewers[github_reviewer]
-          slack-reviewer=$(echo $user_map | jq -r '."'${github_reviewer}'"')
-          echo "slack-reviewer=$slack-reviewer" >> "$GITHUB_OUTPUT"
 
   assign-reviewer:
     runs-on: ubuntu-latest
