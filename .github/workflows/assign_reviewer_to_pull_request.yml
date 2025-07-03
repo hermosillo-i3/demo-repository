@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       github-reviewer: ${{ steps.select-user.outputs.github_reviewer }}
-      slack-reviewer: ${{ steps.select-author.outputs.slack_reviewer }}
+      slack-reviewer: ${{ steps.select-user.outputs.slack_reviewer }}
       random-emoji: ${{ steps.select-emoji.outputs.random_emoji }}
       pr-author-slack: ${{ steps.select-author.outputs.pr_author_slack }}
 
@@ -29,10 +29,6 @@ jobs:
   
             # Get the GitHub actor (author of the PR)
             pr_author="${{ github.actor }}"
-
-            # Extract the PR author's Slack ID from the JSON
-            pr_author_slack=$(echo $user_map | jq -r '."'${pr_author}'"')
-            echo "pr_author_slack=$pr_author_slack" >> "$GITHUB_OUTPUT"
 
             # Parse JSON and filter out the PR author
             filtered_users=$(echo $user_map | jq 'del(."'"$pr_author"'")')
@@ -76,10 +72,8 @@ jobs:
             
             echo "Selected reviewer: $selected_github_user (Slack: $selected_slack_user) with $min_workload open reviews"
             
-            github_reviewer=$selected_github_user
-            slack_reviewer=$selected_slack_user
-            echo "random_user=$selected_slack_user" >> "$GITHUB_OUTPUT"
-            echo "github_reviewer=$selected_github_user" >> "$GITHUB_OUTPUT"
+            echo "github-reviewer=$selected_github_user" >> "$GITHUB_OUTPUT"
+            echo "slack-reviewer=$selected_slack_user" >> "$GITHUB_OUTPUT"
 
       - name: Select a random emoji
         id: select-emoji
@@ -87,7 +81,7 @@ jobs:
           # Select a random emoji from vars.SLACK_EMOJIS
           IFS=' ' read -r -a emojis <<< "${{ vars.SLACK_EMOJIS }}"
           random_emoji=${emojis[$((RANDOM % ${#emojis[@]}))]}
-          echo "random_emoji=$random_emoji" >> "$GITHUB_OUTPUT"
+          echo "random-emoji=$random_emoji" >> "$GITHUB_OUTPUT"
       
       - name: Get PR author
         id: select-author
@@ -100,7 +94,7 @@ jobs:
 
           # Extract the PR author's Slack ID from the JSON
           pr_author_slack=$(echo $user_map | jq -r '."'${pr_author}'"')
-          echo "pr_author_slack=$pr_author_slack" >> "$GITHUB_OUTPUT"
+          echo "pr-author-slack=$pr_author_slack" >> "$GITHUB_OUTPUT"
 
   assign-reviewer:
     runs-on: ubuntu-latest
