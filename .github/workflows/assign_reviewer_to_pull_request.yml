@@ -13,10 +13,10 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      github-reviewer: ${{ steps.select-user.outputs.github_reviewer }}
-      slack-reviewer: ${{ steps.select-user.outputs.slack_reviewer }}
-      random-emoji: ${{ steps.select-emoji.outputs.random_emoji }}
-      pr-author-slack: ${{ steps.select-author.outputs.pr_author_slack }}
+      github-reviewer: ${{ steps.select-user.outputs.github-reviewer }}
+      slack-reviewer: ${{ steps.select-user.outputs.slack-reviewer }}
+      random-emoji: ${{ steps.select-emoji.outputs.random-emoji }}
+      pr-author-slack: ${{ steps.select-author.outputs.pr-author-slack }}
 
     steps:
       - name: Load reviewers and select the one with least workload excluding the PR author
