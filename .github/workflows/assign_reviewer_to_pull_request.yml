@@ -13,10 +13,10 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      random-user: ${{ steps.select-user.outputs.random_user }}
+      github-reviewer: ${{ steps.select-user.outputs.github_reviewer }}
+      slack-reviewer: ${{ steps.select-author.outputs.reviewer_slack }}
       random-emoji: ${{ steps.select-emoji.outputs.random_emoji }}
       pr-author-slack: ${{ steps.select-author.outputs.pr_author_slack }}
-      github-reviewer: ${{ steps.select-user.outputs.github_reviewer }}
 
     steps:
       - name: Load reviewers and select the one with least workload excluding the PR author
@@ -81,7 +81,7 @@ jobs:
           random_emoji=${emojis[$((RANDOM % ${#emojis[@]}))]}
           echo "random_emoji=$random_emoji" >> "$GITHUB_OUTPUT"
       
-      - name: Get PR author Slack user
+      - name: Get PR author and reviewer Slack user
         id: select-author
         run: |
           # Load the JSON data from the GitHub Actions variable or secret
@@ -93,6 +93,10 @@ jobs:
           # Extract the PR author's Slack ID from the JSON
           pr_author_slack=$(echo $user_map | jq -r '."'${pr_author}'"')
           echo "pr_author_slack=$pr_author_slack" >> "$GITHUB_OUTPUT"
+
+          # Get the reviewer Slack user on reviewers[github_reviewer]
+          reviewer_slack=$(echo $user_map | jq -r '."'${github_reviewer}'"')
+          echo "reviewer_slack=$reviewer_slack" >> "$GITHUB_OUTPUT"
 
   assign-reviewer:
     runs-on: ubuntu-latest
@@ -114,10 +118,6 @@ jobs:
             echo "❌ Error: No se pudo seleccionar un reviewer"
             exit 1
           fi
-          
-          # Asignar reviewer usando GitHub CLI (más confiable que curl)
-          gh pr edit $PR_NUMBER --add-reviewer "$REVIEWER" || {
-            echo "❌ Error asignando reviewer con gh cli, intentando con curl..."
             
             # Fallback con curl mejorado
             response=$(curl -s -w "%{http_code}" -X POST \
@@ -137,7 +137,6 @@ jobs:
               echo "$response_body"
               exit 1
             fi
-          }
           
           echo "✅ Reviewer $REVIEWER asignado exitosamente al PR #$PR_NUMBER"
 
@@ -222,7 +221,7 @@ jobs:
                      "type": "section",
                      "text": {
                         "type": "mrkdwn",
-                        "text": "<@${{ needs.setup.outputs.random-user }}> Por favor, revisa este pull request :${{ needs.setup.outputs.random-emoji }}:"
+                        "text": "<@${{ needs.setup.outputs.slack-reviewer }}> Por favor, revisa este pull request :${{ needs.setup.outputs.random-emoji }}:"
                      }
                   },
                   {
