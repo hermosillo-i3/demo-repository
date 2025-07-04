@@ -3,7 +3,7 @@ name: Assign a reviewer for the PR and post it on slack
 on:
    pull_request:
      branches: [main, develop]
-     types: [opened]
+     types: [opened, synchronize]
 
 permissions:
   contents: read
@@ -52,7 +52,7 @@ jobs:
             
             # Get all open PRs from the organization in one call
             all_prs_response=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-              "https://api.github.com/search/issues?q=org:hermosillo-i3+type:pr+state:open&per_page=100")
+              "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open&per_page=100")
             
             echo "Found $(echo "$all_prs_response" | jq '.total_count') open PRs in organization"
             
@@ -64,7 +64,7 @@ jobs:
               
               # Use GitHub search API to count PRs where this user is a requested reviewer
               workload=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                "https://api.github.com/search/issues?q=org:hermosillo-i3+type:pr+state:open+review-requested:$github_user" | \
+                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+review-requested:$github_user" | \
                 jq '.total_count // 0')
               
               echo "User $github_user has $workload open PR reviews"
