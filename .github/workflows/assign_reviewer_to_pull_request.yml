@@ -10,8 +10,123 @@ permissions:
   pull-requests: write
 
 jobs:
+  list-all-open-reviews:
+    runs-on: ubuntu-latest
+    outputs:
+      total-open-reviews: ${{ steps.count-reviews.outputs.total-open-reviews }}
+    steps:
+      - name: List all open pull request reviews in organization
+        id: count-reviews
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          echo "📋 Listando todos los pull request reviews abiertos en la organización..."
+          
+          # Obtener todos los repositorios de la organización
+          repos=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://api.github.com/orgs/${{ github.repository_owner }}/repos?per_page=100&type=all" | \
+            jq -r '.[].name')
+          
+          total_reviews=0
+          
+          echo "============================================"
+          echo "🔍 RESUMEN DE PULL REQUEST REVIEWS ABIERTOS"
+          echo "============================================"
+          
+          for repo in $repos; do
+            echo ""
+            echo "📁 Repositorio: $repo"
+            echo "----------------------------------------"
+            
+            # Obtener PRs abiertos del repositorio
+            prs=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository_owner }}/$repo/pulls?state=open&per_page=100")
+            
+            pr_count=$(echo "$prs" | jq '. | length')
+            
+            if [ "$pr_count" -eq 0 ]; then
+              echo "   ℹ️  No hay PRs abiertos"
+              continue
+            fi
+            
+            echo "   📝 PRs abiertos: $pr_count"
+            
+            # Para cada PR, obtener las revisiones pendientes
+            echo "$prs" | jq -r '.[] | "\(.number)|\(.title)|\(.html_url)|\(.user.login)"' | \
+            while IFS='|' read -r pr_number pr_title pr_url pr_author; do
+              echo "   🔹 PR #$pr_number: $pr_title"
+              echo "      👤 Autor: $pr_author"
+              echo "      🔗 URL: $pr_url"
+              
+              # Obtener revisores solicitados
+              reviewers=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                "https://api.github.com/repos/${{ github.repository_owner }}/$repo/pulls/$pr_number/requested_reviewers")
+              
+              requested_reviewers=$(echo "$reviewers" | jq -r '.users[].login // empty')
+              
+              if [ -n "$requested_reviewers" ]; then
+                echo "      👥 Revisores solicitados:"
+                echo "$requested_reviewers" | while read -r reviewer; do
+                  echo "         - $reviewer"
+                  ((total_reviews++))
+                done
+              fi
+              
+              # Obtener revisiones ya realizadas (pero que pueden necesitar re-review)
+              reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                "https://api.github.com/repos/${{ github.repository_owner }}/$repo/pulls/$pr_number/reviews")
+              
+              pending_reviews=$(echo "$reviews" | jq -r '.[] | select(.state == "REQUESTED") | .user.login' | sort -u)
+              
+              if [ -n "$pending_reviews" ]; then
+                echo "      ⏳ Revisiones pendientes:"
+                echo "$pending_reviews" | while read -r reviewer; do
+                  echo "         - $reviewer"
+                done
+              fi
+              
+              echo ""
+            done
+          done
+          
+          echo "============================================"
+          echo "📊 ESTADÍSTICAS TOTALES"
+          echo "============================================"
+          
+          # Contar total de PRs abiertos en toda la organización
+          total_prs=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open" | \
+            jq '.total_count // 0')
+          
+          echo "🔢 Total de PRs abiertos en la organización: $total_prs"
+          
+          # Contar revisiones pendientes por usuario
+          echo ""
+          echo "👥 CARGA DE TRABAJO POR REVISOR:"
+          echo "--------------------------------"
+          
+          # Obtener usuarios de la configuración
+          user_map='${{ vars.REVIEWERS }}'
+          if [ -n "$user_map" ]; then
+            github_users=($(echo $user_map | jq -r 'keys[]'))
+            
+            for github_user in "${github_users[@]}"; do
+              workload=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+review-requested:$github_user" | \
+                jq '.total_count // 0')
+              
+              echo "   👤 $github_user: $workload reviews pendientes"
+            done
+          fi
+          
+          echo ""
+          echo "============================================"
+          
+          echo "total-open-reviews=$total_prs" >> "$GITHUB_OUTPUT"
+
   setup:
     runs-on: ubuntu-latest
+    needs: [list-all-open-reviews]
     outputs:
       github-reviewer: ${{ steps.select-user.outputs.github-reviewer }}
       slack-reviewer: ${{ steps.select-user.outputs.slack-reviewer }}
@@ -141,7 +256,7 @@ jobs:
   post-on-slack:
     runs-on: ubuntu-latest
     if: always()
-    needs: [setup, assign-reviewer]
+    needs: [list-all-open-reviews, setup, assign-reviewer]
     steps:
       - name: Post to a Slack channel
         if: always()
@@ -224,6 +339,20 @@ jobs:
                   },
                   {
                      "type": "divider"
+                  },
+                  {
+                     "type": "section",
+                     "text": {
+                        "type": "mrkdwn",
+                        "text": "📊 *Estado de la organización:* ${{ needs.list-all-open-reviews.outputs.total-open-reviews }} PRs abiertos en total"
+                     }
+                  },
+                  {
+                     "type": "section",
+                     "text": {
+                        "type": "mrkdwn",
+                        "text": "🔍 *Ver todos los reviews:* <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Logs del workflow>"
+                     }
                   }
                ]
             }
