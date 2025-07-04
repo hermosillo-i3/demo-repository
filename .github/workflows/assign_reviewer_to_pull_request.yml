@@ -48,16 +48,24 @@ jobs:
             selected_slack_user=""
             first_user=true
             
+            echo "Getting all open PRs from organization to count reviewer workload..."
+            
+            # Get all open PRs from the organization in one call
+            all_prs=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+              "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open&per_page=100" | \
+              jq -r '.items[]')
+            
             echo "Checking workload for each potential reviewer..."
             
-            # For each potential reviewer, count their current open PR reviews
+            # For each potential reviewer, count their workload from the single API response
             for github_user in "${github_users[@]}"; do
               echo "Checking workload for: $github_user"
               
-              # Get count of open PRs where this user is a requested reviewer
-              workload=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+review-requested:$github_user" \
-                | jq '.total_count')
+              # Count PRs where this user is a requested reviewer
+              workload=$(echo "$all_prs" | jq -r --arg user "$github_user" '
+                select(.requested_reviewers[]?.login == $user) | 
+                .html_url
+              ' | wc -l)
               
               echo "User $github_user has $workload open PR reviews"
               
