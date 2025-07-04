@@ -40,12 +40,12 @@ jobs:
             github_users=($(echo $user_map | jq -r 'keys[]'))
             
             for github_user in "${github_users[@]}"; do
-              # Contar PRs abiertos donde hizo review (desde fecha inicio)
+              # Contar PRs abiertos donde estás revisando (desde fecha inicio)
               open_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+reviewed-by:$github_user$date_filter" | \
+                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+reviewed-requested:$github_user$date_filter" | \
                 jq '.total_count // 0')
               
-              # Contar PRs cerrados donde hizo review (desde fecha inicio)
+              # Contar PRs cerrados donde revisaste (desde fecha inicio)
               closed_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
                 "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:closed+reviewed-by:$github_user$date_filter" | \
                 jq '.total_count // 0')
