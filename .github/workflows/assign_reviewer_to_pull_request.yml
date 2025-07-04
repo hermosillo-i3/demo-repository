@@ -20,7 +20,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          echo "📋 Obteniendo resumen de pull request reviews abiertos..."
+          echo "📋 Obteniendo resumen de reviews completados y pendientes..."
+          
+          # Obtener la fecha de hoy en formato ISO (UTC) como punto de partida
+          today_date=$(date -u +"%Y-%m-%d")
+          echo "📅 Punto de partida: $today_date"
+          echo "📅 Analizando TODOS los reviews completados (sin límite de tiempo)"
           
           # Contar total de PRs abiertos en toda la organización
           total_prs=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
@@ -28,11 +33,11 @@ jobs:
             jq '.total_count // 0')
           
           echo "============================================"
-          echo "📊 RESUMEN DE REVIEWS PENDIENTES"
+          echo "📊 RESUMEN DE REVIEWS (EQUILIBRIO DE CARGA)"
           echo "============================================"
           echo "🔢 Total de PRs abiertos en la organización: $total_prs"
           echo ""
-          echo "👥 CARGA DE TRABAJO POR REVISOR:"
+          echo "👥 ANÁLISIS DE CARGA DE TRABAJO:"
           echo "--------------------------------"
           
           # Obtener usuarios de la configuración
@@ -41,17 +46,28 @@ jobs:
             github_users=($(echo $user_map | jq -r 'keys[]'))
             
             for github_user in "${github_users[@]}"; do
-              workload=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+              # Contar reviews pendientes (PRs abiertos donde está asignado)
+              pending_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
                 "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+review-requested:$github_user" | \
                 jq '.total_count // 0')
               
-              echo "   👤 $github_user: $workload reviews pendientes"
+              # Contar TODOS los reviews completados (PRs cerrados donde participó)
+              completed_total=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:closed+involves:$github_user" | \
+                jq '.total_count // 0')
+              
+              echo "   👤 $github_user:"
+              echo "      📋 Reviews pendientes: $pending_reviews"
+              echo "      ✅ PRs cerrados (total histórico): $completed_total"
+              echo ""
             done
           else
             echo "   ⚠️  No se encontró configuración de REVIEWERS"
           fi
           
-          echo ""
+          echo "============================================"
+          echo "💡 ESTRATEGIA: Asignar al revisor con MENOS actividad histórica total"
+          echo "   (equilibrio justo basado en TODA la contribución pasada)"
           echo "============================================"
           
           echo "total-open-reviews=$total_prs" >> "$GITHUB_OUTPUT"
@@ -66,7 +82,7 @@ jobs:
       pr-author-slack: ${{ steps.select-author.outputs.pr-author-slack }}
 
     steps:
-      - name: Load reviewers and select the one with least workload excluding the PR author
+      - name: Load reviewers and select the one with least activity today (balanced workload)
         id: select-user
         env:
           GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -89,35 +105,54 @@ jobs:
             # Get all GitHub usernames (keys) from the filtered map
             github_users=($(echo $filtered_users | jq -r 'keys[]'))
             
-            # Initialize variables to track the user with minimum workload
-            min_workload=""
+            # Get today's date for reference
+            today_date=$(date -u +"%Y-%m-%d")
+            
+            # Initialize variables to track the user with minimum total activity
+            min_activity=""
             selected_github_user=""
             selected_slack_user=""
             first_user=true
             
-            echo "Checking workload for each potential reviewer across organization...."
+            echo "🔄 Equilibrando carga: Seleccionando revisor con MENOS actividad histórica total"
+            echo "📅 Analizando TODA la actividad histórica (sin límite de tiempo)"
+            echo "=================================================================="
             
-            # For each potential reviewer, count their workload using GitHub's search syntax
+            # For each potential reviewer, calculate their total historical activity
             for github_user in "${github_users[@]}"; do
-              echo "Checking workload for: $github_user"
+              echo "Analizando actividad histórica de: $github_user"
               
-              # Use GitHub search API to count PRs where this user is a requested reviewer
-              workload=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+review-requested:$github_user" | \
+              # Count ALL completed reviews (PRs closed where user participated)
+              completed_total=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:closed+involves:$github_user" | \
                 jq '.total_count // 0')
               
-              echo "User $github_user has $workload open PR reviews"
+              # Count ALL reviews/comments made
+              reviews_total=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+commenter:$github_user" | \
+                jq '.total_count // 0')
               
-              # Initialize with first user or compare with minimum workload
-              if [ "$first_user" = true ] || [ "$workload" -lt "$min_workload" ]; then
-                min_workload=$workload
+              # Calculate total historical activity
+              total_activity=$((completed_total + reviews_total))
+              
+              echo "  📊 $github_user: $total_activity actividades (total histórico)"
+              echo "      ✅ PRs cerrados: $completed_total"
+              echo "      💬 Reviews/comentarios: $reviews_total"
+              
+              # Select user with minimum total activity (to balance workload fairly)
+              if [ "$first_user" = true ] || [ "$total_activity" -lt "$min_activity" ]; then
+                min_activity=$total_activity
                 selected_github_user=$github_user
                 selected_slack_user=$(echo $filtered_users | jq -r '."'$github_user'"')
                 first_user=false
               fi
             done
             
-            echo "Selected reviewer: $selected_github_user (Slack: $selected_slack_user) with $min_workload open reviews"
+            echo "=================================================================="
+            echo "✅ Revisor seleccionado: $selected_github_user (Slack: $selected_slack_user)"
+            echo "   📊 Actividad histórica total: $min_activity (la más baja del equipo)"
+            echo "   💡 Estrategia: Equilibrio justo basado en TODA la contribución pasada"
+            echo "=================================================================="
             
             echo "github-reviewer=$selected_github_user" >> "$GITHUB_OUTPUT"
             echo "slack-reviewer=$selected_slack_user" >> "$GITHUB_OUTPUT"
@@ -276,6 +311,13 @@ jobs:
                      "type": "section",
                      "text": {
                         "type": "mrkdwn",
+                        "text": "⚖️ *Equilibrio de carga:* Asignado al revisor con menos actividad histórica total"
+                     }
+                  },
+                  {
+                     "type": "section",
+                     "text": {
+                        "type": "mrkdwn",
                         "text": "📊 *Estado de la organización:* ${{ needs.list-all-open-reviews.outputs.total-open-reviews }} PRs abiertos en total"
                      }
                   },
@@ -283,7 +325,7 @@ jobs:
                      "type": "section",
                      "text": {
                         "type": "mrkdwn",
-                        "text": "🔍 *Ver todos los reviews:* <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Logs del workflow>"
+                        "text": "🔍 *Ver análisis completo:* <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Logs del workflow>"
                      }
                   }
                ]
