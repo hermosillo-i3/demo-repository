@@ -56,6 +56,15 @@ jobs:
             
             echo "Found $(echo "$all_prs_response" | jq '.total_count') open PRs in organization"
             
+            # Debug: Show which PRs are being found
+            echo "PRs found:"
+            echo "$all_prs_response" | jq -r '.items[] | "  - \(.repository_url | split("/") | .[-1]): \(.title)"'
+            
+            # Check if we're hitting pagination limits
+            total_count=$(echo "$all_prs_response" | jq '.total_count')
+            items_count=$(echo "$all_prs_response" | jq '.items | length')
+            echo "Total PRs: $total_count, Retrieved: $items_count"
+            
             echo "Checking workload for each potential reviewer..."
             
             # For each potential reviewer, count their workload using GitHub's search syntax
