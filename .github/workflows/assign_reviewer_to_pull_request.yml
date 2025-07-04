@@ -16,7 +16,7 @@ jobs:
       - name: Show reviewer workload summary
         id: count-reviews
         env:
-          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
         run: |
           # Obtener fecha de inicio desde variable de configuración
           start_date="${{ vars.REVIEW_COUNT_START_DATE }}"
@@ -73,7 +73,7 @@ jobs:
       - name: Select reviewer with least total reviews
         id: select-user
         env:
-          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
         run: |
             # Load the JSON data from the GitHub Actions variable or secret
             user_map='${{ vars.REVIEWERS }}'
@@ -179,7 +179,7 @@ jobs:
         
       - name: Assign reviewer to PR
         env:
-          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REVIEWER: ${{ needs.setup.outputs.github-reviewer }}
         run: |
