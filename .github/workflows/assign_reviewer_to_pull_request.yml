@@ -18,6 +18,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
+          # Obtener fecha de inicio desde variable de configuración
+          start_date="${{ vars.REVIEW_COUNT_START_DATE }}"
+          
+          if [ -z "$start_date" ]; then
+            echo "⚠️  Variable REVIEW_COUNT_START_DATE no configurada"
+            echo "📅 Formato requerido: YYYY-MM-DD (ejemplo: 2024-01-01)"
+            echo "📅 Contando desde el inicio de los tiempos..."
+            date_filter=""
+          else
+            echo "📅 Contando reviews desde: $start_date"
+            date_filter="+created:>=$start_date"
+          fi
+          
           echo "📊 RESUMEN DE CARGA DE TRABAJO POR REVISOR"
           echo "=========================================="
           
@@ -27,14 +40,14 @@ jobs:
             github_users=($(echo $user_map | jq -r 'keys[]'))
             
             for github_user in "${github_users[@]}"; do
-              # Contar PRs abiertos donde está asignado como revisor
+              # Contar PRs abiertos donde está asignado como revisor (desde fecha inicio)
               open_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+review-requested:$github_user" | \
+                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+review-requested:$github_user$date_filter" | \
                 jq '.total_count // 0')
               
-              # Contar PRs cerrados donde fue revisor asignado
+              # Contar PRs cerrados donde fue revisor asignado (desde fecha inicio)
               closed_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:closed+review-requested:$github_user" | \
+                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:closed+review-requested:$github_user$date_filter" | \
                 jq '.total_count // 0')
               
               total_reviews=$((open_reviews + closed_reviews))
@@ -80,6 +93,17 @@ jobs:
             # Get all GitHub usernames (keys) from the filtered map
             github_users=($(echo $filtered_users | jq -r 'keys[]'))
             
+            # Obtener fecha de inicio desde variable de configuración
+            start_date="${{ vars.REVIEW_COUNT_START_DATE }}"
+            
+            if [ -z "$start_date" ]; then
+              echo "📅 Contando desde el inicio de los tiempos..."
+              date_filter=""
+            else
+              echo "📅 Contando reviews desde: $start_date"
+              date_filter="+created:>=$start_date"
+            fi
+            
             # Initialize variables to track the user with minimum reviews
             min_reviews=""
             selected_github_user=""
@@ -93,14 +117,14 @@ jobs:
             for github_user in "${github_users[@]}"; do
               echo "Analizando: $github_user"
               
-              # Count PRs abiertos donde está asignado como revisor
+              # Count PRs abiertos donde está asignado como revisor (desde fecha inicio)
               open_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+review-requested:$github_user" | \
+                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+review-requested:$github_user$date_filter" | \
                 jq '.total_count // 0')
               
-              # Count PRs cerrados donde fue revisor asignado
+              # Count PRs cerrados donde fue revisor asignado (desde fecha inicio)
               closed_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:closed+review-requested:$github_user" | \
+                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:closed+review-requested:$github_user$date_filter" | \
                 jq '.total_count // 0')
               
               # Calculate total reviews
@@ -279,7 +303,7 @@ jobs:
                      "type": "section",
                      "text": {
                         "type": "mrkdwn",
-                        "text": "⚖️ *Equilibrio de carga:* Asignado al revisor con menos reviews totales"
+                        "text": "⚖️ *Equilibrio de carga:* Asignado al revisor con menos reviews totales\n🔍 <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Ver cálculo detallado>"
                      }
                   }
                ]
