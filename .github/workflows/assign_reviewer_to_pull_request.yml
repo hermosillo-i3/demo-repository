@@ -95,7 +95,7 @@ jobs:
             selected_slack_user=""
             first_user=true
             
-            echo "Checking workload for each potential reviewer across organization..."
+            echo "Checking workload for each potential reviewer across organization...."
             
             # For each potential reviewer, count their workload using GitHub's search syntax
             for github_user in "${github_users[@]}"; do
