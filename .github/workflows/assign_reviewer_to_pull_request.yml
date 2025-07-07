@@ -3,7 +3,7 @@ name: Assign a reviewer for the PR and post it on slack
 on:
    pull_request:
      branches: [main, develop]
-     types: [opened, synchronize]
+     types: [opened]
 
 permissions:
   contents: read
