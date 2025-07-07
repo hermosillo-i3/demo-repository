@@ -66,10 +66,18 @@ jobs:
             
             # For each potential reviewer, calculate their total reviews
             for github_user in "${github_users[@]}"; do              
-              # Count PRs abiertos donde se solicita review (asignados) - SIN filtro de fecha
-              open_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+              # Count PRs abiertos con review request pendiente
+              pending_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
                 "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+review-requested:$github_user" | \
                 jq '.total_count // 0')
+              
+              # Count PRs abiertos donde ya hizo review pero siguen abiertos
+              reviewed_open=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+reviewed-by:$github_user" | \
+                jq '.total_count // 0')
+              
+              # Total PRs abiertos = pendientes + ya revisados pero aún abiertos
+              open_reviews=$((pending_reviews + reviewed_open))
               
               # Count PRs cerrados donde hizo review - CON filtro de fecha de cierre
               closed_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
@@ -79,7 +87,7 @@ jobs:
               # Calculate total reviews
               total_reviews=$((open_reviews + closed_reviews))
               
-              echo "👤 $github_user: $total_reviews reviews totales ($open_reviews abiertos asignados, $closed_reviews cerrados completados)"
+              echo "👤 $github_user: $total_reviews reviews totales ($pending_reviews pendientes + $reviewed_open revisados abiertos + $closed_reviews cerrados completados)"
               
               # Select user with minimum reviews (to balance workload)
               if [ "$first_user" = true ] || [ "$total_reviews" -lt "$min_reviews" ]; then
