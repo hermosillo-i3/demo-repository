@@ -247,17 +247,7 @@ jobs:
                      "type": "section",
                      "text": {
                         "type": "mrkdwn",
-                        "text": "<@${{ needs.select-reviewer.outputs.slack-reviewer }}> Por favor, revisa este pull request :${{ needs.select-reviewer.outputs.random-emoji }}:"
-                     }
-                  },
-                  {
-                     "type": "divider"
-                  },
-                  {
-                     "type": "section",
-                     "text": {
-                        "type": "mrkdwn",
-                        "text": "⚖️ *Equilibrio de carga:* Asignado al revisor con menos reviews totales\n🔍 <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Ver cálculo detallado>"
+                        "text": "<@${{ needs.select-reviewer.outputs.slack-reviewer }}> Por favor, revisa este pull request :${{ needs.select-reviewer.outputs.random-emoji }}:\n🔍 <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#step:1:1|Consultar puntuación de reviews>"
                      }
                   }
                ]
