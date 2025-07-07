@@ -38,7 +38,7 @@ jobs:
             fi
             
             echo "📊 RESUMEN DE CARGA DE TRABAJO POR REVISOR"
-            echo "=========================================="
+            echo "==========================================================================="
             
             # Load the JSON data from the GitHub Actions variable or secret
             user_map='${{ vars.REVIEWERS }}'
