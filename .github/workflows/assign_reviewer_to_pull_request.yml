@@ -3,7 +3,7 @@ name: Assign a reviewer for the PR and post it on slack
 on:
    pull_request:
      branches: [main, develop]
-     types: [opened]
+     types: [opened, synchronize]
 
 permissions:
   contents: read
@@ -42,7 +42,7 @@ jobs:
             for github_user in "${github_users[@]}"; do
               # Contar PRs abiertos donde estás revisando (desde fecha inicio)
               open_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+reviewed-requested:$github_user$date_filter" | \
+                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+reviewed-requested:$github_user" | \
                 jq '.total_count // 0')
               
               # Contar PRs cerrados donde revisaste (desde fecha inicio)
