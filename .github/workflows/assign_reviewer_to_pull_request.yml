@@ -119,7 +119,7 @@ jobs:
               
               # Count PRs abiertos donde hizo review (desde fecha inicio)
               open_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+reviewed-by:$github_user$date_filter" | \
+                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+reviewed-by:$github_user" | \
                 jq '.total_count // 0')
               
               # Count PRs cerrados donde hizo review (desde fecha inicio)
