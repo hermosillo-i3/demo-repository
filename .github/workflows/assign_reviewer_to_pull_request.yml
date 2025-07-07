@@ -24,7 +24,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
         run: |
-            # Obtener fecha de inicio desde variable de configuración
+            # Obtener al revisor con menos carga para asignarle el PR
             start_date="${{ vars.REVIEW_COUNT_START_DATE }}"
             
             if [ -z "$start_date" ]; then
@@ -33,7 +33,7 @@ jobs:
               echo "📅 Contando desde el inicio de los tiempos..."
               date_filter=""
             else
-              echo "📅 Contando reviews desde: $start_date"
+              echo "📅 Contando todas las reviews abiertas y aquellas cerradas desde: $start_date"
               date_filter="+created:>=$start_date"
             fi
             
@@ -64,13 +64,8 @@ jobs:
             selected_slack_user=""
             first_user=true
             
-            echo "🔄 Seleccionando revisor con MENOS reviews totales"
-            echo "=================================================="
-            
             # For each potential reviewer, calculate their total reviews
-            for github_user in "${github_users[@]}"; do
-              echo "Analizando: $github_user"
-              
+            for github_user in "${github_users[@]}"; do              
               # Count PRs abiertos donde se solicita review (asignados)
               open_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
                 "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+review-requested:$github_user" | \
@@ -95,10 +90,10 @@ jobs:
               fi
             done
             
-            echo "=================================================="
-            echo "✅ Revisor seleccionado: $selected_github_user (Slack: $selected_slack_user)"
-            echo "   📊 Reviews totales: $min_reviews (el menor del equipo)"
-            echo "=================================================="
+            echo "==========================================================================="
+            echo "✅ Revisor seleccionado: $selected_github_user"
+            echo "   📊 Reviews totales: $min_reviews"
+            echo "==========================================================================="
             
             echo "github-reviewer=$selected_github_user" >> "$GITHUB_OUTPUT"
             echo "slack-reviewer=$selected_slack_user" >> "$GITHUB_OUTPUT"
@@ -247,7 +242,7 @@ jobs:
                      "type": "section",
                      "text": {
                         "type": "mrkdwn",
-                        "text": "<@${{ needs.select-reviewer.outputs.slack-reviewer }}> Por favor, revisa este pull request :${{ needs.select-reviewer.outputs.random-emoji }}:\n🔍 <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#step:1:1|Consultar puntuación de reviews>"
+                        "text": "<@${{ needs.select-reviewer.outputs.slack-reviewer }}> Por favor, revisa este pull request :${{ needs.select-reviewer.outputs.random-emoji }}:"
                      }
                   }
                ]
