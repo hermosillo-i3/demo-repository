@@ -31,10 +31,10 @@ jobs:
               echo "⚠️  Variable REVIEW_COUNT_START_DATE no configurada"
               echo "📅 Formato requerido: YYYY-MM-DD (ejemplo: 2024-01-01)"
               echo "📅 Contando desde el inicio de los tiempos..."
-              date_filter=""
+              closed_date_filter=""
             else
               echo "📅 Contando todas las reviews abiertas y aquellas cerradas desde: $start_date"
-              date_filter="+created:>=$start_date"
+              closed_date_filter="+closed:>=$start_date"
             fi
             
             echo "📊 RESUMEN DE CARGA DE TRABAJO POR REVISOR"
@@ -66,14 +66,14 @@ jobs:
             
             # For each potential reviewer, calculate their total reviews
             for github_user in "${github_users[@]}"; do              
-              # Count PRs abiertos donde se solicita review (asignados)
+              # Count PRs abiertos donde se solicita review (asignados) - SIN filtro de fecha
               open_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
                 "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:open+review-requested:$github_user" | \
                 jq '.total_count // 0')
               
-              # Count PRs cerrados donde hizo review (desde fecha inicio)
+              # Count PRs cerrados donde hizo review - CON filtro de fecha de cierre
               closed_reviews=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:closed+reviewed-by:$github_user$date_filter" | \
+                "https://api.github.com/search/issues?q=org:${{ github.repository_owner }}+type:pr+state:closed+reviewed-by:$github_user$closed_date_filter" | \
                 jq '.total_count // 0')
               
               # Calculate total reviews
