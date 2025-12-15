@@ -79,8 +79,15 @@ jobs:
               fi
             done
 
-            # Get all GitHub usernames (keys) from the filtered map and filter out the users that have vacations status
-            github_users=($(echo $filtered_users | jq -r 'keys[]' | grep -vFv "${vacation_users[@]}"))
+            # Get all GitHub usernames (keys) from the filtered map
+            all_github_users=($(echo "$filtered_users" | jq -r 'keys[]'))
+
+            # If there are vacation users, filter them out; otherwise, use all users
+            if [ "${#vacation_users[@]}" -gt 0 ]; then
+              github_users=($(printf '%s\n' "${all_github_users[@]}" | grep -vFf <(printf '%s\n' "${vacation_users[@]}")))
+            else
+              github_users=("${all_github_users[@]}")
+            fi
             
             # Initialize variables to track the user with minimum reviews
             min_reviews=""
