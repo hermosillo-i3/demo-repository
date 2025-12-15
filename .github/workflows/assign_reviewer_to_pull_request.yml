@@ -69,10 +69,11 @@ jobs:
               curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
                 -H "Content-Type: application/json" \
                 "https://slack.com/api/users.profile.get?user=$slack_user" | \
-                jq '.profile.status_emoji')
+                jq -r '.profile.status_emoji // ""')
               github_user=$(echo $filtered_users | jq -r 'to_entries[] | select(.value=="'$slack_user'") | .key')
+              echo " $github_user: $status"
               if [ "$status" == ":palm_tree:" ]; then
-              echo " $github_user no disponible para revisar, se encuentra de vacaciones"
+                echo " $github_user no disponible para revisar, se encuentra de vacaciones"
                 vacation_users+=($github_user)
               else
                 echo " $github_user disponible para revisar"
