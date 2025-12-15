@@ -81,11 +81,12 @@ jobs:
             all_github_users=($(echo "$filtered_users" | jq -r 'keys[]'))
 
             # If there are vacation users, filter them out
-            if [ "${#vacation_users[@]}" -gt 0 ]; then
-              github_users=($(printf '%s\n' "${all_github_users[@]}" | grep -vFf <(printf '%s\n' "${vacation_users[@]}")))
-            else
-              github_users=("${all_github_users[@]}")
-            fi
+            github_users=()
+            for user in "${all_github_users[@]}"; do
+              if [[ ! " ${vacation_users[@]} " =~ " ${user} " ]]; then
+                github_users+=("$user")
+              fi
+            done
             
             # Initialize variables to track the user with minimum reviews
             min_reviews=""
