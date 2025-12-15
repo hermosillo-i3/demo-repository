@@ -63,7 +63,7 @@ jobs:
             # Check the users that have vacations status to filter them out from the list of reviewers
             slack_users=($(echo $filtered_users | jq -r 'values[]'))
 
-            vacation_users=()
+            github_users=()
             for slack_user in "${slack_users[@]}"; do
               status=$(
               curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
@@ -73,21 +73,11 @@ jobs:
               github_user=$(echo $filtered_users | jq -r 'to_entries[] | select(.value=="'$slack_user'") | .key')
               if [ "$status" == ":palm_tree:" ]; then
                 echo "🌴 $github_user no disponible/está de vacaciones - excluido de la selección de revisores"
-                vacation_users+=($github_user)
+              else
+                github_users+=("$github_user")
               fi
             done
 
-            # Get all GitHub usernames (keys) from the filtered map
-            all_github_users=($(echo "$filtered_users" | jq -r 'keys[]'))
-
-            # If there are vacation users, filter them out
-            github_users=()
-            for user in "${all_github_users[@]}"; do
-              if [[ ! " ${vacation_users[@]} " =~ " ${user} " ]]; then
-                github_users+=("$user")
-              fi
-            done
-            
             # Initialize variables to track the user with minimum reviews
             min_reviews=""
             selected_github_user=""
