@@ -74,6 +74,7 @@ jobs:
               if [ "$status" == ":palm_tree:" ]; then
                 echo " $github_user no disponible para revisar, se encuentra de vacaciones"
                 vacation_users+=($github_user)
+              fi
             done
 
             # Get all GitHub usernames (keys) from the filtered map
@@ -83,6 +84,7 @@ jobs:
             if [ "${#vacation_users[@]}" -gt 0 ]; then
               users="${github_users[@]}"
               github_users=($(printf '%s\n' "${users[@]}" | grep -vFf <(printf '%s\n' "${vacation_users[@]}")))
+            fi
             
             # Initialize variables to track the user with minimum reviews
             min_reviews=""
