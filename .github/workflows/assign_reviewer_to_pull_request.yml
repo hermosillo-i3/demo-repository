@@ -72,7 +72,7 @@ jobs:
                 jq -r '.profile.status_emoji // ""')
               github_user=$(echo $filtered_users | jq -r 'to_entries[] | select(.value=="'$slack_user'") | .key')
               if [ "$status" == ":palm_tree:" ]; then
-                echo " $github_user no disponible para revisar, se encuentra de vacaciones"
+                echo "🌴 $github_user no disponible/está de vacaciones - excluido de la selección de revisores"
                 vacation_users+=($github_user)
               fi
             done
