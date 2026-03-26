@@ -1,4 +1,9 @@
 
+# 1.0.2
+Date: 26 Marzo, 2026
+* [NEW]
+ - More features
+
 # 1.0.1
 Date: 26 Marzo, 2026
 * [NEW]
