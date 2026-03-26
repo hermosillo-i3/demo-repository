@@ -1,0 +1,118 @@
+name: CI/CD
+
+on:
+   pull_request:
+     branches: [main, develop]
+     types: [opened]
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      random-user: ${{ steps.select-user.outputs.random_user }}
+      random-emoji: ${{ steps.select-emoji.outputs.random_emoji }}
+    steps:      
+      - name: Load reviewers and select a random one excluding the PR author
+        id: select-user
+        run: |
+            # Load the JSON data from the GitHub Actions variable or secret
+            user_map='${{ vars.REVIEWERS }}'
+  
+             # Get the GitHub actor (author of the PR)
+            pr_author="${{ github.actor }}"
+
+            # Parse JSON and filter out the PR author
+            filtered_users=$(echo $user_map | jq 'del(."'"$pr_author"'")')
+
+            # Check if there are any users left after filtering
+            if [ "$(echo $filtered_users | jq '. | length')" -eq 0 ]; then
+               echo "No other users available for selection."
+               exit 1
+            fi
+
+            # Extract the Slack IDs into an array
+            slack_ids=($(echo $filtered_users | jq -r 'to_entries[] | .value'))
+
+            # Randomly select a Slack user from the filtered array
+            random_user=${slack_ids[$((RANDOM % ${#slack_ids[@]}))]}
+            echo "random_user=$random_user" >> "$GITHUB_OUTPUT"
+
+      - name: Select a random emoji
+        id: select-emoji
+        run: |
+          # Select a random emoji from vars.SLACK_EMOJIS
+          IFS=' ' read -r -a emojis <<< "${{ vars.SLACK_EMOJIS }}"
+          random_emoji=${emojis[$((RANDOM % ${#emojis[@]}))]}
+          echo "random_emoji=$random_emoji" >> "$GITHUB_OUTPUT"
+
+
+  post-on-slack:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [setup]
+    steps:
+      - name: Post to a Slack channel
+        if: always()
+        id: slack
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          channel-id: '${{ vars.SLACK_PULL_REQUEST_CHANNEL_ID }}'
+          payload: |
+            {
+               "blocks": [
+                  {
+                     "type": "context",
+                     "elements": [
+                        {
+                           "type": "image",
+                           "image_url": "https://avatars.githubusercontent.com/u/${{github.actor_id}}?s=400&u=b81e946713a585cd4895227203a3d2ba5d5b3b46&v=4",
+                           "alt_text": "actor"
+                        },
+                        {
+                           "type": "mrkdwn",
+                           "text": "<https://github.com/${{github.actor}}|${{github.actor}}>"
+                        }
+                     ]
+                  },
+                  {
+                     "type": "section",
+                     "text": {
+                        "type": "mrkdwn",
+                        "text": "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Workflow # ${{ github.run_id }}>"
+                     }
+                  },
+                  {
+                     "type": "section",
+                     "fields": [
+                        {
+                           "type": "mrkdwn",
+                           "text": "*Repo*"
+                        },
+                        {
+                           "type": "mrkdwn",
+                           "text": "*Pull request*"
+                        },
+                        {
+                           "type": "mrkdwn",
+                           "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}>"
+                        },
+                        {
+                           "type": "mrkdwn",
+                           "text": "<${{ github.event.pull_request.html_url }}| Ver PR>"
+                        }
+                     ]
+                  },
+                  {
+                     "type": "section",
+                     "text": {
+                        "type": "mrkdwn",
+                        "text": "<@${{ needs.setup.outputs.random-user }}> Por favor, revisa este pull request :${{ needs.setup.outputs.random-emoji }}:"
+                     }
+                  },
+                  {
+                     "type": "divider"
+                  }
+               ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
