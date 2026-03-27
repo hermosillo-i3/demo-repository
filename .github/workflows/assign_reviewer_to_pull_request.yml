@@ -108,9 +108,9 @@ jobs:
                   echo "$body" | jq -r '.total_count'
                   return 0
                 elif [ "$remaining" = "0" ]; then
-                  echo >&2 "⚠️ Rate limit exceeded en search/issues (intento $attempt/$MAX_SEARCH_ATTEMPTS)"
+                  echo >&2 "⚠️ Rate limit exceeded en search/issues"
                 else
-                  echo >&2 "⚠️ Estatus HTTP: $status en search/issues (intento $attempt/$MAX_SEARCH_ATTEMPTS)"
+                  echo >&2 "⚠️ Estatus HTTP: $status en search/issues"
                 fi
 
                 # Calculate the wait time based on the retry_after or reset headers
