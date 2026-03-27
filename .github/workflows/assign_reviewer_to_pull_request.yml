@@ -122,9 +122,6 @@ jobs:
                   wait_sec=$((reset - now + 2))
                 fi
 
-                # Add a random delay to the wait time to avoid simultaneous requests
-                jitter=$((RANDOM % 4))
-                wait_sec=$((wait_sec + jitter))
                 echo >&2 "⏳ Esperando ${wait_sec}s para el reinicio del rate limit y volver a intentar..."
                 sleep "$wait_sec"
               done
