@@ -107,6 +107,8 @@ jobs:
                 if [ "$status" = "200" ] && echo "$body" | jq -e '.total_count | type == "number"' >/dev/null 2>&1; then
                   echo "$body" | jq -r '.total_count'
                   return 0
+                elif [ "$remaining" = "0" ]; then
+                  echo >&2 "⚠️ Rate limit exceeded en search/issues (intento $attempt/$MAX_SEARCH_ATTEMPTS)"
                 else
                   echo >&2 "⚠️ Estatus HTTP: $status en search/issues (intento $attempt/$MAX_SEARCH_ATTEMPTS)"
                 fi
@@ -121,11 +123,9 @@ jobs:
                 fi
 
                 # Add a random delay to the wait time to avoid simultaneous requests
-                echo >&2 "wait_sec antes de jitter: $wait_sec"
                 jitter=$((RANDOM % 4))
-                echo >&2 "jitter: $jitter"
                 wait_sec=$((wait_sec + jitter))
-                echo >&2 "⏳ Esperando ${wait_sec}s antes de reintentar (remaining=${remaining:-?})..."
+                echo >&2 "⏳ Esperando ${wait_sec}s para el reinicio del rate limit y volver a intentar..."
                 sleep "$wait_sec"
               done
 
