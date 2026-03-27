@@ -1,24 +1,55 @@
-name: CI/CD
+name: Assign a reviewer for the PR and post it on slack
 
 on:
    pull_request:
      branches: [main, develop]
-     types: [opened]
+     types: [opened, reopened]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
-  setup:
+  select-reviewer:
     runs-on: ubuntu-latest
     outputs:
-      random-user: ${{ steps.select-user.outputs.random_user }}
-      random-emoji: ${{ steps.select-emoji.outputs.random_emoji }}
-    steps:      
-      - name: Load reviewers and select a random one excluding the PR author
+      github-reviewer: ${{ steps.select-user.outputs.github-reviewer }}
+      slack-reviewer: ${{ steps.select-user.outputs.slack-reviewer }}
+      random-emoji: ${{ steps.select-emoji.outputs.random-emoji }}
+      pr-author-slack: ${{ steps.select-author.outputs.pr-author-slack }}
+
+    steps:
+      - name: Select reviewer with least total reviews and show workload summary
         id: select-user
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          ORG: ${{ github.repository_owner }}
         run: |
+            # Obtener al revisor con menos carga para asignarle el PR
+            start_date="${{ vars.REVIEW_COUNT_START_DATE }}"
+            
+            if [ -z "$start_date" ]; then
+              echo "⚠️  Variable REVIEW_COUNT_START_DATE no configurada"
+              echo "📅 Formato requerido: YYYY-MM-DD (ejemplo: 2024-01-01)"
+              echo "📅 Contando desde el inicio de los tiempos..."
+              closed_date_filter=""
+            else
+              echo "📅 Contando todas las reviews abiertas y aquellas cerradas desde: $start_date"
+              closed_date_filter=" closed:>=$start_date"
+            fi
+            
+            echo "📊 RESUMEN DE CARGA DE TRABAJO POR REVISOR"
+            echo "==========================================================================="
+            
             # Load the JSON data from the GitHub Actions variable or secret
             user_map='${{ vars.REVIEWERS }}'
   
-             # Get the GitHub actor (author of the PR)
+            # Get the GitHub actor (author of the PR)
             pr_author="${{ github.actor }}"
 
             # Parse JSON and filter out the PR author
@@ -30,12 +61,118 @@ jobs:
                exit 1
             fi
 
-            # Extract the Slack IDs into an array
-            slack_ids=($(echo $filtered_users | jq -r 'to_entries[] | .value'))
+            # Check the users that have vacations status to filter them out from the list of reviewers
+            slack_users=($(echo $filtered_users | jq -r 'values[]'))
 
-            # Randomly select a Slack user from the filtered array
-            random_user=${slack_ids[$((RANDOM % ${#slack_ids[@]}))]}
-            echo "random_user=$random_user" >> "$GITHUB_OUTPUT"
+            github_users=()
+            for slack_user in "${slack_users[@]}"; do
+              status=$(
+              curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+                -H "Content-Type: application/json" \
+                "https://slack.com/api/users.profile.get?user=$slack_user" | \
+                jq -r '.profile.status_emoji // ""')
+              github_user=$(echo $filtered_users | jq -r 'to_entries[] | select(.value=="'$slack_user'") | .key')
+              if [ "$status" == ":palm_tree:" ]; then
+                echo "🌴 $github_user no disponible/está de vacaciones - excluido de la selección de revisores"
+              else
+                github_users+=("$github_user")
+              fi
+            done
+
+            # REST search/issues tiene límite bajo (p. ej. 30 req/min). Reintentamos ante 403/límite
+            # y NO tratamos respuestas fallidas como total_count 0 (evita asignar mal al reviewer).
+            MAX_SEARCH_ATTEMPTS=20
+
+            github_search_issues_total_count() {
+              local search_q="$1"
+              local attempt=0
+              local hdr body status http_line remaining reset retry_after wait_sec now jitter
+
+              while [ "$attempt" -lt "$MAX_SEARCH_ATTEMPTS" ]; do
+                attempt=$((attempt + 1))
+                hdr=$(mktemp)
+                body=$(curl -sS -D "$hdr" -G \
+                  -H "Authorization: Bearer $GITHUB_TOKEN" \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "X-GitHub-Api-Version: 2022-11-28" \
+                  --data-urlencode "q=$search_q" \
+                  "https://api.github.com/search/issues")
+
+                http_line=$(grep -i '^HTTP/' "$hdr" | tail -n1 | tr -d '\r')
+                status="${http_line##* }"
+                remaining=$(grep -i '^x-ratelimit-remaining:' "$hdr" | tr -d '\r' | awk '{print $2}' | tail -n1)
+                reset=$(grep -i '^x-ratelimit-reset:' "$hdr" | tr -d '\r' | awk '{print $2}' | tail -n1)
+                retry_after=$(grep -i '^retry-after:' "$hdr" | tr -d '\r' | awk '{print $2}' | tail -n1)
+                rm -f "$hdr"
+
+                if [ "$status" = "200" ] && echo "$body" | jq -e '.total_count | type == "number"' >/dev/null 2>&1; then
+                  echo "$body" | jq -r '.total_count'
+                  return 0
+                fi
+                if [ "$status" = "200" ]; then
+                  echo >&2 "⚠️  Respuesta 200 sin total_count válido (intento $attempt/$MAX_SEARCH_ATTEMPTS)"
+                  echo "$body" | jq -c '.' 2>/dev/null | head -c 2000 >&2 || true
+                else
+                  echo >&2 "⚠️  search/issues HTTP $status (intento $attempt/$MAX_SEARCH_ATTEMPTS)"
+                fi
+
+                wait_sec=""
+                if [ -n "$retry_after" ] && [ "$retry_after" -gt 0 ] 2>/dev/null; then
+                  wait_sec=$retry_after
+                elif [ -n "$reset" ]; then
+                  now=$(date +%s)
+                  wait_sec=$((reset - now + 2))
+                  [ "$wait_sec" -lt 2 ] && wait_sec=2
+                else
+                  wait_sec=$((attempt * 3))
+                fi
+                # Pequeño jitter para que varios workflows no despierten a la vez
+                jitter=$((RANDOM % 4))
+                wait_sec=$((wait_sec + jitter))
+                echo >&2 "⏳ Esperando ${wait_sec}s antes de reintentar (remaining=${remaining:-?})..."
+                sleep "$wait_sec"
+              done
+
+              echo >&2 "❌ No se pudo obtener total_count de search/issues tras $MAX_SEARCH_ATTEMPTS intentos."
+              echo 0
+              return 0
+            }
+
+            # Initialize variables to track the user with minimum reviews
+            min_reviews=""
+            selected_github_user=""
+            selected_slack_user=""
+            first_user=true
+
+            for github_user in "${github_users[@]}"; do
+              # Espaciar peticiones para reducir picos cuando muchos PRs abren a la vez
+              sleep $((RANDOM % 3))
+
+              pending_reviews=$(github_search_issues_total_count "org:${ORG} type:pr state:open review-requested:${github_user}" || echo 0)
+              reviewed_open=$(github_search_issues_total_count "org:${ORG} type:pr state:open reviewed-by:${github_user}" || echo 0)
+
+              closed_reviews=$(github_search_issues_total_count "org:${ORG} type:pr state:closed reviewed-by:${github_user}${closed_date_filter}" || echo 0)
+
+              open_reviews=$((pending_reviews + reviewed_open))
+              total_reviews=$((open_reviews + closed_reviews))
+
+              echo "👤 $github_user: $total_reviews reviews totales ($pending_reviews pendientes + $reviewed_open revisados abiertos + $closed_reviews cerrados completados)"
+
+              if [ "$first_user" = true ] || [ "$total_reviews" -lt "$min_reviews" ]; then
+                min_reviews=$total_reviews
+                selected_github_user=$github_user
+                selected_slack_user=$(echo $filtered_users | jq -r '."'$github_user'"')
+                first_user=false
+              fi
+            done
+            
+            echo "==========================================================================="
+            echo "✅ Revisor seleccionado: $selected_github_user"
+            echo "   📊 Reviews totales: $min_reviews"
+            echo "==========================================================================="
+            
+            echo "github-reviewer=$selected_github_user" >> "$GITHUB_OUTPUT"
+            echo "slack-reviewer=$selected_slack_user" >> "$GITHUB_OUTPUT"
 
       - name: Select a random emoji
         id: select-emoji
@@ -43,76 +180,256 @@ jobs:
           # Select a random emoji from vars.SLACK_EMOJIS
           IFS=' ' read -r -a emojis <<< "${{ vars.SLACK_EMOJIS }}"
           random_emoji=${emojis[$((RANDOM % ${#emojis[@]}))]}
-          echo "random_emoji=$random_emoji" >> "$GITHUB_OUTPUT"
+          echo "random-emoji=$random_emoji" >> "$GITHUB_OUTPUT"
+      
+      - name: Get PR author
+        id: select-author
+        run: |
+          # Load the JSON data from the GitHub Actions variable or secret
+          user_map='${{ vars.AUTHORS }}'
+  
+          # Get the GitHub actor (author of the PR)
+          pr_author="${{ github.actor }}"
 
+          # Extract the PR author's Slack ID from the JSON
+          pr_author_slack=$(echo $user_map | jq -r '."'${pr_author}'"')
+          echo "pr-author-slack=$pr_author_slack" >> "$GITHUB_OUTPUT"
+
+  check-microservices-deployment-status:
+    runs-on: ubuntu-latest
+    if: github.base_ref == 'main'
+    outputs:
+      warnings: ${{ steps.check-microservices.outputs.warnings }}
+    steps:
+      - name: Check microservices deployment status
+        id: check-microservices
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
+          ORG_NAME: ${{ github.repository_owner }}
+        run: |
+          echo "🔍 Verificando estado de microservicios..."
+          
+          # Array de microservicios a verificar
+          MICROSERVICES=("user-ms" "supplier-ms" "submittals-ms" "file-utils-ms")
+          WARNINGS=""
+          
+          # Función para verificar un microservicio
+          check_microservice() {
+            local MS_NAME=$1
+            echo "📊 Verificando $MS_NAME..."
+            
+            # Obtener información de la rama main
+            MAIN_RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$ORG_NAME/$MS_NAME/branches/main")
+            
+            MAIN_HTTP_CODE=$(echo "$MAIN_RESPONSE" | grep -o "HTTPSTATUS:[0-9]*" | cut -d: -f2)
+            MAIN_BODY=$(echo "$MAIN_RESPONSE" | sed 's/HTTPSTATUS:[0-9]*$//')
+            
+            if [ "$MAIN_HTTP_CODE" != "200" ]; then
+              echo "⚠️  Error al consultar main de $MS_NAME"
+              return
+            fi
+            
+            MAIN_TREE=$(echo "$MAIN_BODY" | jq -r '.commit.commit.tree.sha // "null"')
+            
+            if [ "$MAIN_TREE" = "null" ] || [ -z "$MAIN_TREE" ]; then
+              echo "⚠️  No se pudo obtener tree de main para $MS_NAME"
+              return
+            fi
+            
+            # Obtener información de la rama develop
+            DEVELOP_RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$ORG_NAME/$MS_NAME/branches/develop")
+            
+            DEVELOP_HTTP_CODE=$(echo "$DEVELOP_RESPONSE" | grep -o "HTTPSTATUS:[0-9]*" | cut -d: -f2)
+            DEVELOP_BODY=$(echo "$DEVELOP_RESPONSE" | sed 's/HTTPSTATUS:[0-9]*$//')
+            
+            if [ "$DEVELOP_HTTP_CODE" != "200" ]; then
+              echo "⚠️  Error al consultar develop de $MS_NAME"
+              return
+            fi
+            
+            DEVELOP_TREE=$(echo "$DEVELOP_BODY" | jq -r '.commit.commit.tree.sha // "null"')
+            
+            if [ "$DEVELOP_TREE" = "null" ] || [ -z "$DEVELOP_TREE" ]; then
+              echo "⚠️  No se pudo obtener tree de develop para $MS_NAME"
+              return
+            fi
+            
+            # Comparar árboles (tree) en lugar de commits
+            if [ "$MAIN_TREE" = "$DEVELOP_TREE" ]; then
+              echo "✅ $MS_NAME está sincronizado"
+            else
+              echo "⚠️  $MS_NAME tiene cambios pendientes"
+              if [ -n "$WARNINGS" ]; then
+                WARNINGS="${WARNINGS}\n⚠️ $MS_NAME tiene cambios pendientes en develop"
+              else
+                WARNINGS="⚠️ $MS_NAME tiene cambios pendientes en develop"
+              fi
+            fi
+          }
+          
+          # Verificar cada microservicio
+          for MS in "${MICROSERVICES[@]}"; do
+            check_microservice "$MS"
+          done
+          
+          # Guardar warnings en output
+          if [ -n "$WARNINGS" ]; then
+            echo "warnings<<EOF" >> $GITHUB_OUTPUT
+            echo -e "$WARNINGS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "warnings=" >> $GITHUB_OUTPUT
+          fi
+
+  assign-reviewer:
+    runs-on: ubuntu-latest
+    needs: [select-reviewer]
+    steps:
+      - name: Assign reviewer to PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEWER: ${{ needs.select-reviewer.outputs.github-reviewer }}
+        run: |
+          echo "Asignando reviewer: $REVIEWER al PR #$PR_NUMBER"
+          
+          # Verificar que tenemos los datos necesarios
+          if [ -z "$REVIEWER" ]; then
+            echo "❌ Error: No se pudo seleccionar un reviewer"
+            exit 1
+          fi
+            
+            # Fallback con curl mejorado
+            response=$(curl -s -w "%{http_code}" -X POST \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUMBER/requested_reviewers" \
+              -d "{\"reviewers\":[\"$REVIEWER\"]}")
+              
+            http_code="${response: -3}"
+            response_body="${response%???}"
+            
+            if [ "$http_code" -eq 201 ]; then
+              echo "✅ Reviewer asignado exitosamente via API"
+            else
+              echo "❌ Error HTTP $http_code al asignar reviewer:"
+              echo "$response_body"
+              exit 1
+            fi
+          
+          echo "✅ Reviewer $REVIEWER asignado exitosamente al PR #$PR_NUMBER"
 
   post-on-slack:
     runs-on: ubuntu-latest
     if: always()
-    needs: [setup]
+    needs: [select-reviewer, assign-reviewer, check-microservices-deployment-status]
     steps:
       - name: Post to a Slack channel
         if: always()
         id: slack
-        uses: slackapi/slack-github-action@v1.26.0
-        with:
-          channel-id: '${{ vars.SLACK_PULL_REQUEST_CHANNEL_ID }}'
-          payload: |
-            {
-               "blocks": [
-                  {
-                     "type": "context",
-                     "elements": [
-                        {
-                           "type": "image",
-                           "image_url": "https://avatars.githubusercontent.com/u/${{github.actor_id}}?s=400&u=b81e946713a585cd4895227203a3d2ba5d5b3b46&v=4",
-                           "alt_text": "actor"
-                        },
-                        {
-                           "type": "mrkdwn",
-                           "text": "<https://github.com/${{github.actor}}|${{github.actor}}>"
-                        }
-                     ]
-                  },
-                  {
-                     "type": "section",
-                     "text": {
-                        "type": "mrkdwn",
-                        "text": "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Workflow # ${{ github.run_id }}>"
-                     }
-                  },
-                  {
-                     "type": "section",
-                     "fields": [
-                        {
-                           "type": "mrkdwn",
-                           "text": "*Repo*"
-                        },
-                        {
-                           "type": "mrkdwn",
-                           "text": "*Pull request*"
-                        },
-                        {
-                           "type": "mrkdwn",
-                           "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}>"
-                        },
-                        {
-                           "type": "mrkdwn",
-                           "text": "<${{ github.event.pull_request.html_url }}| Ver PR>"
-                        }
-                     ]
-                  },
-                  {
-                     "type": "section",
-                     "text": {
-                        "type": "mrkdwn",
-                        "text": "<@${{ needs.setup.outputs.random-user }}> Por favor, revisa este pull request :${{ needs.setup.outputs.random-emoji }}:"
-                     }
-                  },
-                  {
-                     "type": "divider"
-                  }
-               ]
-            }
+        run: |
+          # Construir el payload de Slack dinámicamente
+          WARNING_BLOCK=""
+          if [ -n "${{ needs.check-microservices-deployment-status.outputs.warnings }}" ]; then
+            WARNING_BLOCK=',{
+               "type": "section",
+               "text": {
+                  "type": "mrkdwn",
+                  "text": "${{ needs.check-microservices-deployment-status.outputs.warnings }}"
+               }
+            }'
+          fi
+          
+          # Crear el payload JSON
+          PAYLOAD=$(cat <<EOF
+          {
+             "channel": "${{ vars.SLACK_PULL_REQUEST_CHANNEL_ID }}",
+             "blocks": [
+                {
+                   "type": "context",
+                   "elements": [
+                      {
+                         "type": "image",
+                         "image_url": "https://avatars.githubusercontent.com/u/${{github.actor_id}}?s=400&u=b81e946713a585cd4895227203a3d2ba5d5b3b46&v=4",
+                         "alt_text": "actor"
+                      },
+                      {
+                         "type": "mrkdwn",
+                         "text": "<https://github.com/${{github.actor}}|${{github.actor}}>"
+                      }
+                   ]
+                },
+                {
+                   "type": "section",
+                   "text": {
+                      "type": "mrkdwn",
+                      "text": "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Workflow # ${{ github.run_id }}>"
+                   }
+                },
+                {
+                   "type": "section",
+                   "fields": [
+                      {
+                         "type": "mrkdwn",
+                         "text": "*Repo*"
+                      },
+                      {
+                         "type": "mrkdwn",
+                         "text": "*Pull request*"
+                      },
+                      {
+                         "type": "mrkdwn",
+                         "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}>"
+                      },
+                      {
+                         "type": "mrkdwn",
+                         "text": "<${{ github.event.pull_request.html_url }}| Ver PR>"
+                      }
+                   ]
+                },
+                {
+                   "type": "section",
+                   "fields": [
+                      {
+                         "type": "mrkdwn",
+                         "text": "*Target Branch*"
+                      },
+                      {
+                         "type": "mrkdwn",
+                         "text": "*PR Author*"
+                      },
+                      {
+                         "type": "mrkdwn",
+                         "text": "<https://github.com/${{ github.repository }}/tree/${{ github.event.pull_request.head.ref }}|${{ github.event.pull_request.head.ref }}>"
+                      },
+                      {
+                         "type": "mrkdwn",
+                         "text": "<@${{ needs.select-reviewer.outputs.pr-author-slack }}>"
+                      }
+                   ]
+                },
+                {
+                   "type": "section",
+                   "text": {
+                      "type": "mrkdwn",
+                      "text": "<@${{ needs.select-reviewer.outputs.slack-reviewer }}> Por favor, revisa este pull request :${{ needs.select-reviewer.outputs.random-emoji }}:"
+                   }
+                }${WARNING_BLOCK}
+             ]
+          }
+          EOF
+          )
+          
+          # Enviar a Slack usando curl
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "https://slack.com/api/chat.postMessage"
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
