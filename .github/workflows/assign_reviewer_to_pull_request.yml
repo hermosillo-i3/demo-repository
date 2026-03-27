@@ -86,20 +86,20 @@ jobs:
             github_search_issues_total_count() {
               local search_q="$1"
               local attempt=0
-              local hdr body status http_line remaining reset retry_after wait_sec now jitter
+              local hdr body status FULL_RESPONSE remaining reset retry_after wait_sec now jitter
 
               while [ "$attempt" -lt "$MAX_SEARCH_ATTEMPTS" ]; do
                 attempt=$((attempt + 1))
                 hdr=$(mktemp)
-                body=$(curl -sS -D "$hdr" -G \
+                # Respuesta JSON + "|" + código HTTP (mismo patrón que otros servicios); -D guarda cabeceras para rate limit
+                FULL_RESPONSE=$(curl -sS -D "$hdr" -G \
                   -H "Authorization: Bearer $GITHUB_TOKEN" \
-                  -H "Accept: application/vnd.github+json" \
-                  -H "X-GitHub-Api-Version: 2022-11-28" \
                   --data-urlencode "q=$search_q" \
-                  "https://api.github.com/search/issues")
+                  -w "|%{http_code}" \
+                  "https://api.github.com/search/issues") || true
+                status="${FULL_RESPONSE##*|}"
+                body="${FULL_RESPONSE%|${status}}"
 
-                http_line=$(grep -i '^HTTP/' "$hdr" | tail -n1 | tr -d '\r')
-                status="${http_line##* }"
                 remaining=$(grep -i '^x-ratelimit-remaining:' "$hdr" | tr -d '\r' | awk '{print $2}' | tail -n1)
                 reset=$(grep -i '^x-ratelimit-reset:' "$hdr" | tr -d '\r' | awk '{print $2}' | tail -n1)
                 retry_after=$(grep -i '^retry-after:' "$hdr" | tr -d '\r' | awk '{print $2}' | tail -n1)
