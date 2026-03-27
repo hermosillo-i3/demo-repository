@@ -127,7 +127,9 @@ jobs:
                   wait_sec=$((attempt * 3))
                 fi
                 # Pequeño jitter para que varios workflows no despierten a la vez
+                echo >&2 "wait_sec antes de jitter: $wait_sec"
                 jitter=$((RANDOM % 4))
+                echo >&2 "jitter: $jitter"
                 wait_sec=$((wait_sec + jitter))
                 echo >&2 "⏳ Esperando ${wait_sec}s antes de reintentar (remaining=${remaining:-?})..."
                 sleep "$wait_sec"
