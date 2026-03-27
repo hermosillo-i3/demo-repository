@@ -6,6 +6,7 @@ Date: March 27, 2026
   * Verificación de sincronización main/develop contra microservicios en el workflow de asignación de revisores
 * [UPDATE]
   * Workflow `assign_reviewer_to_pull_request`: flujo `select-reviewer` → `assign-reviewer`, Slack con rama objetivo, autor del PR y bloque opcional de advertencias de microservicios
+  * PR hacia `develop`: `feature/test-assign-reviewer-to-pr`
 
 v 1.0.3
 * [NEW]
