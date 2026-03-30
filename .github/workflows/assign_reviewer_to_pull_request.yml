@@ -102,10 +102,12 @@ jobs:
                 pr_number=$(echo "$item" | jq -r '.number')
                 pr_created_at=$(echo "$item" | jq -r '.created_at')
                 pr_url=$(echo "$item" | jq -r '.pull_request.url')
+                author_login=$(echo "$item" | jq -r '.user.login // empty')
                 echo >&2 "repo_full: $repo_full"
                 echo >&2 "pr_number: $pr_number"
                 echo >&2 "pr_created_at: $pr_created_at"
                 echo >&2 "pr_url: $pr_url"
+                echo >&2 "author_login: $author_login"
                 echo >&2 "--------------------------------"
 
                 if [ "$repo_full" = "$current_repo" ] && [ "$pr_number" -eq "$current_pr_number" ]; then
@@ -127,6 +129,11 @@ jobs:
                 fi
                 echo >&2 "is_before: $is_before"
                 echo >&2 "--------------------------------"
+
+                if [ "$is_before" = true ] && [ "$author_login" = "github-actions[bot]" ]; then
+                  echo >&2 "Omitiendo PR de github-actions[bot] en la cola (no aplica revisor): $repo_full#$pr_number"
+                  continue
+                fi
 
                 if [ "$is_before" = true ]; then
                   pr_detail=$(github_api_request_with_retries "$pr_url" '.number | type == "number"' "detalle de PR $pr_url") || return 1
