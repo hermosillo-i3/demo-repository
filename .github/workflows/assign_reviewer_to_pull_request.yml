@@ -135,8 +135,6 @@ jobs:
 
                 if [ "$is_before" = true ]; then
                   pr_detail=$(github_api_request_with_retries "$pr_url" '.number | type == "number"' "detalle de PR $pr_url") || return 1
-                  echo >&2 "pr_detail: $pr_detail"
-                  echo >&2 "--------------------------------"
                   has_user_reviewers=$(echo "$pr_detail" | jq '(.requested_reviewers // []) | length')
                   echo >&2 "has_user_reviewers: $has_user_reviewers"
                   echo >&2 "--------------------------------"
