@@ -14,7 +14,161 @@ permissions:
   pull-requests: write
 
 jobs:
+  ensure-no-pending-previous-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for previous org PRs to have reviewers
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
+          ORG: ${{ github.repository_owner }}
+          CURRENT_REPO: ${{ github.repository }}
+          CURRENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          CURRENT_PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
+        run: |
+          MAX_SEARCH_ATTEMPTS=10
+          MAX_GATE_WAIT_SECONDS="600"
+          GATE_SLEEP_SECONDS="15"
+
+          github_api_request_with_retries() {
+            local url="$1"
+            local expected_jq="$2"
+            local context="$3"
+            local attempt=0
+            local hdr body status FULL_RESPONSE remaining reset retry_after wait_sec now
+
+            while [ "$attempt" -lt "$MAX_SEARCH_ATTEMPTS" ]; do
+              attempt=$((attempt + 1))
+              hdr=$(mktemp)
+
+              FULL_RESPONSE=$(curl -sS -D "$hdr" \
+                -X "$method" \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                -w "|%{http_code}" \
+                "$url") || true
+
+              status="${FULL_RESPONSE##*|}"
+              body="${FULL_RESPONSE%|${status}}"
+
+              remaining=$(grep -i '^x-ratelimit-remaining:' "$hdr" | tr -d '\r' | awk '{print $2}' | tail -n1)
+              reset=$(grep -i '^x-ratelimit-reset:' "$hdr" | tr -d '\r' | awk '{print $2}' | tail -n1)
+              retry_after=$(grep -i '^retry-after:' "$hdr" | tr -d '\r' | awk '{print $2}' | tail -n1)
+              rm -f "$hdr"
+
+              if [ "$status" = "200" ] && echo "$body" | jq -e "$expected_jq" >/dev/null 2>&1; then
+                echo "$body"
+                return 0
+              elif [ "$remaining" = "0" ]; then
+                echo >&2 "⚠️ Rate limit exceeded en $context"
+              else
+                echo >&2 "⚠️ Estatus HTTP: $status en $context"
+              fi
+
+              wait_sec=0
+              if [ -n "$retry_after" ] && [ "$retry_after" -gt 0 ] 2>/dev/null; then
+                wait_sec=$retry_after
+              elif [ -n "$reset" ]; then
+                now=$(date +%s)
+                wait_sec=$((reset - now + 2))
+              else
+                wait_sec=5
+              fi
+
+              if [ "$wait_sec" -lt 1 ]; then
+                wait_sec=1
+              fi
+              echo >&2 "⏳ Esperando ${wait_sec}s para reintentar $context..."
+              sleep "$wait_sec"
+            done
+
+            echo >&2 "❌ No se pudo completar $context tras $MAX_SEARCH_ATTEMPTS intentos."
+            return 1
+          }
+
+          has_previous_pr_without_reviewer() {
+            local current_repo="$1"
+            local current_pr_number="$2"
+            local current_pr_created_at="$3"
+            local page=1
+            local page_data item repo_full pr_number pr_created_at pr_url pr_detail has_user_reviewers has_team_reviewers
+            local found_current=false
+
+            while [ "$page" -le 10 ]; do
+              page_data=$(github_api_request_with_retries "https://api.github.com/search/issues?q=org:${ORG}+is:pr+is:open&sort=created&order=asc&per_page=10&page=${page}" '.items | type == "array"' "search/issues org-wide abiertos") || return 1
+
+              while IFS= read -r item; do
+                repo_full=$(echo "$item" | jq -r '.repository_url | sub("^https://api.github.com/repos/"; "")')
+                pr_number=$(echo "$item" | jq -r '.number')
+                pr_created_at=$(echo "$item" | jq -r '.created_at')
+                pr_url=$(echo "$item" | jq -r '.pull_request.url')
+
+                if [ "$repo_full" = "$current_repo" ] && [ "$pr_number" -eq "$current_pr_number" ]; then
+                  found_current=true
+                  break
+                fi
+
+                is_before=false
+                if [[ "$pr_created_at" < "$current_pr_created_at" ]]; then
+                  is_before=true
+                elif [[ "$pr_created_at" == "$current_pr_created_at" ]]; then
+                  if [[ "$repo_full" < "$current_repo" ]]; then
+                    is_before=true
+                  elif [[ "$repo_full" == "$current_repo" && "$pr_number" -lt "$current_pr_number" ]]; then
+                    is_before=true
+                  fi
+                fi
+
+                if [ "$is_before" = true ]; then
+                  pr_detail=$(github_api_request_with_retries "$pr_url" '.number | type == "number"' "detalle de PR $pr_url" "GET") || return 1
+
+                  has_user_reviewers=$(echo "$pr_detail" | jq '(.requested_reviewers // []) | length')
+
+                  if [ "$has_user_reviewers" -eq 0 ]; then
+                    echo "$repo_full#$pr_number"
+                    return 0
+                  fi
+                fi
+              done < <(echo "$page_data" | jq -c '.items[]')
+
+              if [ "$found_current" = true ]; then
+                break
+              fi
+
+              if [ "$(echo "$page_data" | jq '.items | length')" -lt 10 ]; then
+                break
+              fi
+
+              page=$((page + 1))
+            done
+
+            return 2
+          }
+
+          echo "🔒 Verificando si existen PRs anteriores sin reviewer asignado (cola org-wide)..."
+          gate_waited=0
+          while true; do
+            blocking_pr=$(has_previous_pr_without_reviewer "$CURRENT_REPO" "$CURRENT_PR_NUMBER" "$CURRENT_PR_CREATED_AT")
+            status=$?
+
+            if [ "$status" -eq 0 ]; then
+              if [ "$gate_waited" -ge "$MAX_GATE_WAIT_SECONDS" ]; then
+                echo "❌ Timeout: aún existe un PR anterior sin reviewer asignado: $blocking_pr"
+                exit 1
+              fi
+              echo "⏳ Esperando turno. PR anterior sin reviewer: $blocking_pr. Reintento en ${GATE_SLEEP_SECONDS}s..."
+              sleep "$GATE_SLEEP_SECONDS"
+              gate_waited=$((gate_waited + GATE_SLEEP_SECONDS))
+            elif [ "$status" -eq 2 ]; then
+              echo "✅ Cola org-wide libre para este PR; continuando con selección de reviewer."
+              break
+            else
+              echo "❌ No se pudo evaluar la cola org-wide de PRs; abortando para evitar asignación inconsistente."
+              exit 1
+            fi
+          done
+
   select-reviewer:
+    needs: [ensure-no-pending-previous-prs]
     runs-on: ubuntu-latest
     outputs:
       github-reviewer: ${{ steps.select-user.outputs.github-reviewer }}
