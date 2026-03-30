@@ -41,7 +41,6 @@ jobs:
               hdr=$(mktemp)
 
               FULL_RESPONSE=$(curl -sS -D "$hdr" \
-                -X "$method" \
                 -H "Authorization: Bearer $GITHUB_TOKEN" \
                 -H "Accept: application/vnd.github+json" \
                 -w "|%{http_code}" \
@@ -95,14 +94,23 @@ jobs:
 
             while [ "$page" -le 10 ]; do
               page_data=$(github_api_request_with_retries "https://api.github.com/search/issues?q=org:${ORG}+is:pr+is:open&sort=created&order=asc&per_page=10&page=${page}" '.items | type == "array"' "search/issues org-wide abiertos") || return 1
+              echo "page_data: $page_data"
+              echo "--------------------------------"
 
               while IFS= read -r item; do
                 repo_full=$(echo "$item" | jq -r '.repository_url | sub("^https://api.github.com/repos/"; "")')
                 pr_number=$(echo "$item" | jq -r '.number')
                 pr_created_at=$(echo "$item" | jq -r '.created_at')
                 pr_url=$(echo "$item" | jq -r '.pull_request.url')
+                echo "repo_full: $repo_full"
+                echo "pr_number: $pr_number"
+                echo "pr_created_at: $pr_created_at"
+                echo "pr_url: $pr_url"
+                echo "--------------------------------"
 
                 if [ "$repo_full" = "$current_repo" ] && [ "$pr_number" -eq "$current_pr_number" ]; then
+                  echo "found_current: $found_current"
+                  echo "--------------------------------"
                   found_current=true
                   break
                 fi
@@ -117,12 +125,16 @@ jobs:
                     is_before=true
                   fi
                 fi
+                echo "is_before: $is_before"
+                echo "--------------------------------"
 
                 if [ "$is_before" = true ]; then
-                  pr_detail=$(github_api_request_with_retries "$pr_url" '.number | type == "number"' "detalle de PR $pr_url" "GET") || return 1
-
+                  pr_detail=$(github_api_request_with_retries "$pr_url" '.number | type == "number"' "detalle de PR $pr_url") || return 1
+                  echo "pr_detail: $pr_detail"
+                  echo "--------------------------------"
                   has_user_reviewers=$(echo "$pr_detail" | jq '(.requested_reviewers // []) | length')
-
+                  echo "has_user_reviewers: $has_user_reviewers"
+                  echo "--------------------------------"
                   if [ "$has_user_reviewers" -eq 0 ]; then
                     echo "$repo_full#$pr_number"
                     return 0
@@ -147,6 +159,10 @@ jobs:
           echo "🔒 Verificando si existen PRs anteriores sin reviewer asignado (cola org-wide)..."
           gate_waited=0
           while true; do
+            echo "CURRENT_REPO: $CURRENT_REPO"
+            echo "CURRENT_PR_NUMBER: $CURRENT_PR_NUMBER"
+            echo "CURRENT_PR_CREATED_AT: $CURRENT_PR_CREATED_AT"
+            echo "--------------------------------"
             blocking_pr=$(has_previous_pr_without_reviewer "$CURRENT_REPO" "$CURRENT_PR_NUMBER" "$CURRENT_PR_CREATED_AT")
             status=$?
 
