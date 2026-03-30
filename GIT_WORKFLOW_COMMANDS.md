@@ -104,31 +104,12 @@ git log --oneline -3
 
 El script automatiza todo el proceso:
 
-**Linux/Mac/Git Bash:**
 ```bash
 # Dar permisos de ejecución (solo la primera vez)
 chmod +x create-release.sh
 
-# Crear release con incremento patch (1.0.0 → 1.0.1)
-./create-release.sh patch
-
-# O incremento minor (1.0.0 → 1.1.0)
-./create-release.sh minor
-
-# O incremento major (1.0.0 → 2.0.0)
-./create-release.sh major
-```
-
-**Windows PowerShell:**
-```powershell
-# Crear release con incremento patch (1.0.0 → 1.0.1)
-.\create-release.ps1 -Type patch
-
-# O incremento minor (1.0.0 → 1.1.0)
-.\create-release.ps1 -Type minor
-
-# O incremento major (1.0.0 → 2.0.0)
-.\create-release.ps1 -Type major
+# Crear release (incrementa PATCH automáticamente: 1.0.0 → 1.0.1)
+./create-release.sh
 ```
 
 El script hace automáticamente:
@@ -181,13 +162,14 @@ Después de que QAS se despliegue:
 
 ## 4. Simulación de Hotfix
 
-### Opción A: Script Automático para Hotfix
-
-**IMPORTANTE:** Los hotfixes se crean desde un tag existente, NO desde develop.
+### Opción A: Script Automático para Hotfix (Recomendado)
 
 ```bash
+# Dar permisos (solo la primera vez)
+chmod +x create-hotfix.sh
+
 # Primero, crear la rama hotfix desde el tag
-git checkout -b hotfix/critical-bug 1.0.0
+git checkout -b hotfix/critical-bug 1.0.5
 
 # Hacer cambios y commits
 echo "// Bug fix applied" >> login.js
@@ -200,21 +182,19 @@ git push origin hotfix/critical-bug
 # Volver a develop para usar el script
 git checkout develop
 
-# OPCIÓN 1: Usar script (incrementa automáticamente desde último tag)
-./create-release.sh patch
-# Esto creará 1.0.1 automáticamente
-
-# OPCIÓN 2: Manual - especificar versión exacta
-# Ver en sección "Opción B" abajo
+# Usar script de hotfix (incrementa MINOR: 1.0.5 → 1.1.0)
+./create-hotfix.sh
 ```
+
+**Nota:** Los hotfixes incrementan MINOR (1.0.5 → 1.1.0) mientras que releases incrementan PATCH (1.0.0 → 1.0.1).
 
 ### Opción B: Crear Hotfix Tag Manualmente
 
 Si prefieres control total:
 
 ```bash
-# Crear rama de hotfix desde el tag 1.0.0
-git checkout -b hotfix/critical-bug 1.0.0
+# Crear rama de hotfix desde el tag 1.0.5
+git checkout -b hotfix/critical-bug 1.0.5
 
 # Hacer el commit de fix
 echo "// Bug fix applied" >> login.js
@@ -228,32 +208,30 @@ git push origin hotfix/critical-bug
 git checkout develop
 git pull origin develop
 
-# Actualizar package.json a 1.0.1
-npm version 1.0.1 --no-git-tag-version
+# Actualizar package.json a 1.1.0 (incremento MINOR)
+npm version 1.1.0 --no-git-tag-version
 
 # Commit en develop
 git add package.json
-git commit -m "chore: bump version to 1.0.1"
+git commit -m "chore: bump version to 1.1.0"
 
-# Crear tag apuntando al commit de la rama hotfix
-# Obtener el SHA del último commit en hotfix/critical-bug
-HOTFIX_SHA=$(git rev-parse hotfix/critical-bug)
-git tag -a 1.0.1 -m "Hotfix 1.0.1 - Critical login bug fix" $HOTFIX_SHA
+# Crear tag
+git tag -a 1.1.0 -m "Hotfix 1.1.0 - Critical login bug fix"
 
 # Push de develop y tag
 git push origin develop
-git push origin 1.0.1
+git push origin 1.1.0
 ```
 
 **Nota sobre el flujo automático:**
 
-Al hacer push del tag `1.0.1`, se dispara el workflow completo:
+Al hacer push del tag `1.1.0`, se dispara el workflow completo:
 1. ✅ Deploy a QAS (automático)
 2. ⏸️ Espera aprobación para PRD (manual en GitHub UI)
 3. ✅ Deploy a PRD (después de aprobar en GitHub)
 4. ✅ Backport a develop (solo si PRD fue exitoso)
 
-**Importante:** El backport traerá el commit del hotfix a develop. Como ya actualizaste el package.json en develop antes de crear el tag, tendrás que resolver el merge si hay diferencias.
+**Importante:** El commit con el package.json actualizado ya está en develop (lo hiciste antes de crear el tag), por lo que el backport no causará conflictos en package.json.
 
 ## 5. Verificación del Flujo Completo
 
@@ -323,26 +301,31 @@ git cherry-pick --continue
 git push origin develop
 ```
 
-## 7. Simulación de Segundo Hotfix (Opcional)
+## 7. Ejemplo de Secuencia: Releases y Hotfixes
 
-Para probar el flujo nuevamente con otro hotfix:
+Para ver cómo se incrementan las versiones:
 
 ```bash
-# Crear hotfix desde 1.0.1
-git checkout -b hotfix/another-fix 1.0.1
+# Release inicial
+./create-release.sh  # 0.0.0 → 0.0.1
 
-# Hacer cambios
-echo "// Another fix" >> login.js
-git add login.js
-git commit -m "fix: resolve another bug"
+# Otra release
+./create-release.sh  # 0.0.1 → 0.0.2
 
-# Crear tag
-git tag -a 1.0.2 -m "Hotfix 1.0.2 - Another bug fix"
+# Hotfix urgente (incrementa MINOR)
+./create-hotfix.sh   # 0.0.2 → 0.1.0
 
-# Push
-git push origin hotfix/another-fix
-git push origin 1.0.2
+# Más releases (continúan con PATCH)
+./create-release.sh  # 0.1.0 → 0.1.1
+./create-release.sh  # 0.1.1 → 0.1.2
+
+# Otro hotfix
+./create-hotfix.sh   # 0.1.2 → 0.2.0
 ```
+
+**Patrón:**
+- Releases = incremento PATCH
+- Hotfixes = incremento MINOR (resetea PATCH a 0)
 
 ## 8. Comandos Útiles de Verificación
 
@@ -377,42 +360,53 @@ git log 1.0.0..develop --oneline
 5. Usar **Squash and Merge** en GitHub
 6. `git checkout develop && git pull origin develop`
 
-### Para Releases
+### Para Releases (Incremento PATCH)
 
 **Con Script (Recomendado):**
 ```bash
 git checkout develop
-./create-release.sh patch   # o minor, o major
-# El script hace TODO: actualiza package.json, commit, tag, push
+./create-release.sh
+# Incrementa PATCH: 1.0.0 → 1.0.1
 ```
 
 **Manual:**
-1. Actualizar package.json: `npm version X.Y.Z --no-git-tag-version`
-2. Commit: `git add package.json && git commit -m "chore: bump version to X.Y.Z"`
-3. Tag: `git tag -a X.Y.Z -m "Release X.Y.Z"`
-4. Push: `git push origin develop && git push origin X.Y.Z`
-5. Aprobar en GitHub: Actions → Deploy and Backport → Review deployments
-
-### Para Hotfixes
-
-**Con Script (desde develop):**
 ```bash
-# 1. Crear rama hotfix y hacer fixes
-git checkout -b hotfix/bug-fix X.Y.Z
+git checkout develop
+npm version 1.0.1 --no-git-tag-version
+git add package.json
+git commit -m "chore: bump version to 1.0.1"
+git tag -a 1.0.1 -m "Release 1.0.1"
+git push origin develop
+git push origin 1.0.1
+```
+
+### Para Hotfixes (Incremento MINOR)
+
+**Con Script (Recomendado):**
+```bash
+# 1. Crear rama hotfix y hacer fixes (opcional, solo para organización)
+git checkout -b hotfix/bug-fix 1.0.5
 # ... hacer cambios y commits ...
 git push origin hotfix/bug-fix
 
-# 2. Volver a develop y usar script
+# 2. Volver a develop y usar script de hotfix
 git checkout develop
-./create-release.sh patch  # Incrementa automáticamente
+./create-hotfix.sh
+# Incrementa MINOR: 1.0.5 → 1.1.0
 ```
 
 **Manual:**
-1. `git checkout -b hotfix/descripcion X.Y.Z` (desde tag anterior)
-2. Hacer commits de fix
-3. `git push origin hotfix/descripcion`
-4. Desde develop: actualizar package.json, commit, tag, push (igual que release)
-5. Aprobar en GitHub: Actions → Deploy and Backport → Review deployments
+```bash
+git checkout develop
+npm version 1.1.0 --no-git-tag-version
+git add package.json
+git commit -m "chore: bump version to 1.1.0"
+git tag -a 1.1.0 -m "Hotfix 1.1.0"
+git push origin develop
+git push origin 1.1.0
+```
+
+**Nota:** En ambos casos, después del push debes aprobar en GitHub Actions
 
 ## Resumen del Flujo Automático
 

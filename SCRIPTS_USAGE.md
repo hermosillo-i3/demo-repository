@@ -4,49 +4,33 @@ Este documento explica cómo usar los scripts automatizados para crear releases 
 
 ## Scripts Disponibles
 
-- **`create-release.sh`** - Para Linux/Mac/Git Bash
-- **`create-release.ps1`** - Para Windows PowerShell
-
-Ambos hacen lo mismo, usa el apropiado para tu sistema.
+- **`create-release.sh`** - Crea releases con incremento PATCH automático
+- **`create-hotfix.sh`** - Crea hotfixes con incremento MINOR automático
 
 ## Uso Básico
-
-### Linux/Mac/Git Bash
 
 ```bash
 # Dar permisos (solo la primera vez)
 chmod +x create-release.sh
+chmod +x create-hotfix.sh
 
-# Crear release con incremento patch (1.0.0 → 1.0.1)
-./create-release.sh patch
-
-# Crear release con incremento minor (1.0.0 → 1.1.0)
-./create-release.sh minor
-
-# Crear release con incremento major (1.0.0 → 2.0.0)
-./create-release.sh major
-
-# Por defecto es patch si no especificas
+# Crear release (incrementa PATCH: 1.0.0 → 1.0.1)
 ./create-release.sh
+
+# Crear hotfix (incrementa MINOR: 1.0.5 → 1.1.0)
+./create-hotfix.sh
 ```
 
-### Windows PowerShell
+## Diferencia entre Release y Hotfix
 
-```powershell
-# Crear release con incremento patch (1.0.0 → 1.0.1)
-.\create-release.ps1 -Type patch
+| Tipo | Script | Incremento | Ejemplo |
+|------|--------|------------|---------|
+| Release | `create-release.sh` | PATCH | 1.0.0 → 1.0.1 |
+| Hotfix | `create-hotfix.sh` | MINOR | 1.0.5 → 1.1.0 |
 
-# Crear release con incremento minor (1.0.0 → 1.1.0)
-.\create-release.ps1 -Type minor
+## ¿Qué Hacen los Scripts?
 
-# Crear release con incremento major (1.0.0 → 2.0.0)
-.\create-release.ps1 -Type major
-
-# Por defecto es patch si no especificas
-.\create-release.ps1
-```
-
-## ¿Qué Hace el Script?
+### Script: create-release.sh
 
 1. **Verifica prerrequisitos:**
    - Estás en la rama `develop`
@@ -58,29 +42,19 @@ chmod +x create-release.sh
    - Si no hay tags, usa `0.0.0` como base
 
 3. **Calcula nueva versión:**
-   - **patch:** Incrementa el último número (1.0.0 → 1.0.1)
-   - **minor:** Incrementa el segundo número (1.0.0 → 1.1.0)
-   - **major:** Incrementa el primer número (1.0.0 → 2.0.0)
+   - **Incrementa PATCH automáticamente:** 1.0.0 → 1.0.1
 
 4. **Pide confirmación:**
    - Te muestra la nueva versión
    - Espera tu confirmación (y/n)
 
-5. **Actualiza package.json:**
-   - Usa `npm version` para actualizar
-   - NO crea tag automático de npm
+5. **Actualiza package.json, commit, tag y push**
 
-6. **Crea commit en develop:**
-   - Commit mensaje: `"chore: bump version to X.Y.Z"`
-   - Solo incluye package.json
+### Script: create-hotfix.sh
 
-7. **Crea tag:**
-   - Tag anotado con mensaje descriptivo
-
-8. **Push:**
-   - Sube el commit a develop
-   - Sube el tag
-   - **Esto dispara el workflow de deploy automáticamente**
+Igual que `create-release.sh` pero:
+- **Incrementa MINOR y resetea PATCH:** 1.0.5 → 1.1.0
+- Mensaje del tag: "Hotfix X.Y.Z"
 
 ## Ejemplos de Uso
 
@@ -88,39 +62,56 @@ chmod +x create-release.sh
 
 ```bash
 # Estado actual: no hay tags
-./create-release.sh minor
+./create-release.sh
 
 # Output:
 # 📌 Último tag: 0.0.0
-# 🆕 Nueva versión: 0.1.0
-# ¿Crear release 0.1.0? (y/n) y
-# ✅ Release 0.1.0 creado exitosamente!
+# 🆕 Nueva versión (PATCH): 0.0.1
+# ¿Crear release 0.0.1? (y/n) y
+# ✅ Release 0.0.1 creado exitosamente!
 ```
 
-### Ejemplo 2: Hotfix
+### Ejemplo 2: Release Normal
 
 ```bash
 # Último tag: 1.0.0
-./create-release.sh patch
+./create-release.sh
 
 # Output:
 # 📌 Último tag: 1.0.0
-# 🆕 Nueva versión: 1.0.1
+# 🆕 Nueva versión (PATCH): 1.0.1
 # ¿Crear release 1.0.1? (y/n) y
 # ✅ Release 1.0.1 creado exitosamente!
 ```
 
-### Ejemplo 3: Major Release
+### Ejemplo 3: Hotfix (MINOR)
 
 ```bash
-# Último tag: 1.5.3
-./create-release.sh major
+# Último tag: 1.0.5
+./create-hotfix.sh
 
 # Output:
-# 📌 Último tag: 1.5.3
-# 🆕 Nueva versión: 2.0.0
-# ¿Crear release 2.0.0? (y/n) y
-# ✅ Release 2.0.0 creado exitosamente!
+# 📌 Último tag: 1.0.5
+# 🆕 Nueva versión (HOTFIX/MINOR): 1.1.0
+# ¿Crear hotfix 1.1.0? (y/n) y
+# ✅ Hotfix 1.1.0 creado exitosamente!
+```
+
+### Ejemplo 4: Secuencia de Releases y Hotfixes
+
+```bash
+# Release 1
+./create-release.sh  # 0.0.0 → 0.0.1
+
+# Release 2
+./create-release.sh  # 0.0.1 → 0.0.2
+
+# Hotfix urgente
+./create-hotfix.sh   # 0.0.2 → 0.1.0
+
+# Más releases
+./create-release.sh  # 0.1.0 → 0.1.1
+./create-release.sh  # 0.1.1 → 0.1.2
 ```
 
 ## Flujo Completo con el Script
@@ -131,7 +122,9 @@ git checkout develop
 git pull origin develop
 
 # 2. Ejecutar script
-./create-release.sh patch
+./create-release.sh  # Para releases (patch)
+# o
+./create-hotfix.sh   # Para hotfixes (minor)
 
 # 3. El script hace todo automáticamente:
 #    - Actualiza package.json
@@ -148,13 +141,12 @@ gh run list --workflow=backport-hotfix.yml
 
 ## Verificaciones de Seguridad
 
-El script incluye validaciones:
+Los scripts incluyen validaciones:
 
 - ✅ Verifica que estás en `develop`
 - ✅ Verifica que no hay cambios sin commitear
-- ✅ Actualiza develop antes de crear release
+- ✅ Actualiza develop antes de crear release/hotfix
 - ✅ Pide confirmación antes de crear el tag
-- ✅ Valida el tipo de incremento (patch/minor/major)
 
 ## Troubleshooting
 
@@ -201,13 +193,36 @@ git push origin develop
 git push origin 2.5.7
 ```
 
+## Cuándo Usar Cada Script
+
+| Situación | Script a Usar | Resultado |
+|-----------|---------------|-----------|
+| Release normal | `./create-release.sh` | 1.0.0 → 1.0.1 |
+| Otra release | `./create-release.sh` | 1.0.1 → 1.0.2 |
+| Bug crítico en producción | `./create-hotfix.sh` | 1.0.5 → 1.1.0 |
+| Otro hotfix | `./create-hotfix.sh` | 1.1.0 → 1.2.0 |
+
+## Para Incremento MAJOR (manual)
+
+Si necesitas cambiar el major version (1.x.x → 2.0.0):
+
+```bash
+git checkout develop
+npm version 2.0.0 --no-git-tag-version
+git add package.json
+git commit -m "chore: bump version to 2.0.0"
+git tag -a 2.0.0 -m "Release 2.0.0"
+git push origin develop
+git push origin 2.0.0
+```
+
 ## Comparación Script vs Manual
 
 | Aspecto | Script | Manual |
 |---------|--------|--------|
-| Velocidad | ⚡ Muy rápido | 🐢 Varios comandos |
+| Velocidad | ⚡ Un comando | 🐢 5-6 comandos |
 | Errores | ✅ Validaciones automáticas | ⚠️ Propenso a errores |
-| Flexibilidad | 🎯 patch/minor/major | 🔧 Versión exacta |
+| Flexibilidad | 🎯 patch o minor | 🔧 Cualquier versión |
 | Aprendizaje | 📚 Abstracción | 🎓 Entiendes cada paso |
 
-**Recomendación:** Usa el script para day-to-day, manual para casos especiales.
+**Recomendación:** Usa los scripts para releases y hotfixes normales, manual para casos especiales (ej: major version).

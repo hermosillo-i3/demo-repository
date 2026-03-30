@@ -19,8 +19,8 @@ Este repositorio implementa un flujo de trabajo basado en Git con `develop` como
 
 ### 🛠️ Scripts Automatizados
 
-- **`create-release.sh`** - Script bash para crear releases (Linux/Mac/Git Bash)
-- **`create-release.ps1`** - Script PowerShell para crear releases (Windows)
+- **`create-release.sh`** - Crea release con incremento patch (1.0.0 → 1.0.1)
+- **`create-hotfix.sh`** - Crea hotfix con incremento minor (1.0.5 → 1.1.0)
 
 ### ⚙️ GitHub Actions
 

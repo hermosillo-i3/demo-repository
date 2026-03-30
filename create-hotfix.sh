@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Script para crear release automáticamente
-# Incrementa automáticamente el PATCH (1.0.0 → 1.0.1)
-# Uso: ./create-release.sh
+# Script para crear hotfix automáticamente
+# Incrementa automáticamente el MINOR (1.0.5 → 1.1.0)
+# Uso: ./create-hotfix.sh
 
 set -e  # Salir si hay error
 
@@ -38,14 +38,15 @@ echo -e "${GREEN}📌 Último tag: ${LAST_TAG}${NC}"
 # Parsear la versión
 IFS='.' read -r MAJOR MINOR PATCH <<< "$LAST_TAG"
 
-# Incrementar PATCH automáticamente (releases siempre incrementan patch)
-PATCH=$((PATCH + 1))
+# Incrementar MINOR automáticamente (hotfixes incrementan minor)
+MINOR=$((MINOR + 1))
+PATCH=0
 
 NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-echo -e "${GREEN}🆕 Nueva versión (PATCH): ${NEW_VERSION}${NC}"
+echo -e "${GREEN}🆕 Nueva versión (HOTFIX/MINOR): ${NEW_VERSION}${NC}"
 
 # Confirmar con usuario
-read -p "¿Crear release ${NEW_VERSION}? (y/n) " -n 1 -r
+read -p "¿Crear hotfix ${NEW_VERSION}? (y/n) " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo -e "${YELLOW}❌ Cancelado${NC}"
@@ -63,13 +64,13 @@ git commit -m "chore: bump version to ${NEW_VERSION}"
 
 # Crear tag
 echo -e "${YELLOW}🏷️  Creando tag ${NEW_VERSION}...${NC}"
-git tag -a $NEW_VERSION -m "Release ${NEW_VERSION}"
+git tag -a $NEW_VERSION -m "Hotfix ${NEW_VERSION}"
 
 # Push del commit y tag
 echo -e "${YELLOW}🚀 Haciendo push a develop y tag...${NC}"
 git push origin develop
 git push origin $NEW_VERSION
 
-echo -e "${GREEN}✅ Release ${NEW_VERSION} creado exitosamente!${NC}"
+echo -e "${GREEN}✅ Hotfix ${NEW_VERSION} creado exitosamente!${NC}"
 echo -e "${GREEN}🎯 El workflow de deploy se disparó automáticamente.${NC}"
 echo -e "${YELLOW}👉 Verifica en: https://github.com/$(git config --get remote.origin.url | sed 's/.*:\(.*\)\.git/\1/')/actions${NC}"
