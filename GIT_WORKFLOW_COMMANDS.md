@@ -100,16 +100,66 @@ git log --oneline -3
 
 ## 3. Creación de Release Tag y Deploy
 
+### Opción A: Script Automático (Recomendado)
+
+El script automatiza todo el proceso:
+
+**Linux/Mac/Git Bash:**
 ```bash
-# Desde develop, crear tag anotado 1.0.0
-git tag -a 1.0.0 -m "Release 1.0.0 - First stable release"
+# Dar permisos de ejecución (solo la primera vez)
+chmod +x create-release.sh
 
-# Subir el tag al remoto (esto dispara el workflow completo)
+# Crear release con incremento patch (1.0.0 → 1.0.1)
+./create-release.sh patch
+
+# O incremento minor (1.0.0 → 1.1.0)
+./create-release.sh minor
+
+# O incremento major (1.0.0 → 2.0.0)
+./create-release.sh major
+```
+
+**Windows PowerShell:**
+```powershell
+# Crear release con incremento patch (1.0.0 → 1.0.1)
+.\create-release.ps1 -Type patch
+
+# O incremento minor (1.0.0 → 1.1.0)
+.\create-release.ps1 -Type minor
+
+# O incremento major (1.0.0 → 2.0.0)
+.\create-release.ps1 -Type major
+```
+
+El script hace automáticamente:
+1. Obtiene el último tag
+2. Incrementa la versión
+3. Actualiza package.json
+4. Crea commit en develop
+5. Crea el tag
+6. Push del commit y tag
+
+### Opción B: Comandos Manuales
+
+Si prefieres hacerlo manualmente:
+
+```bash
+# Obtener último tag
+git describe --tags --abbrev=0
+
+# Actualizar package.json manualmente a la nueva versión
+npm version 1.0.0 --no-git-tag-version
+
+# Hacer commit
+git add package.json
+git commit -m "chore: bump version to 1.0.0"
+
+# Crear tag
+git tag -a 1.0.0 -m "Release 1.0.0"
+
+# Push commit y tag
+git push origin develop
 git push origin 1.0.0
-
-# Verificar que el tag se creó correctamente
-git tag -l
-git show 1.0.0
 ```
 
 **Importante:** Al hacer push del tag, se dispara automáticamente el workflow que:
@@ -131,7 +181,36 @@ Después de que QAS se despliegue:
 
 ## 4. Simulación de Hotfix
 
-### Crear rama de hotfix desde el tag
+### Opción A: Script Automático para Hotfix
+
+**IMPORTANTE:** Los hotfixes se crean desde un tag existente, NO desde develop.
+
+```bash
+# Primero, crear la rama hotfix desde el tag
+git checkout -b hotfix/critical-bug 1.0.0
+
+# Hacer cambios y commits
+echo "// Bug fix applied" >> login.js
+git add login.js
+git commit -m "fix: resolve critical login bug"
+
+# Push de la rama hotfix
+git push origin hotfix/critical-bug
+
+# Volver a develop para usar el script
+git checkout develop
+
+# OPCIÓN 1: Usar script (incrementa automáticamente desde último tag)
+./create-release.sh patch
+# Esto creará 1.0.1 automáticamente
+
+# OPCIÓN 2: Manual - especificar versión exacta
+# Ver en sección "Opción B" abajo
+```
+
+### Opción B: Crear Hotfix Tag Manualmente
+
+Si prefieres control total:
 
 ```bash
 # Crear rama de hotfix desde el tag 1.0.0
@@ -142,28 +221,39 @@ echo "// Bug fix applied" >> login.js
 git add login.js
 git commit -m "fix: resolve critical login bug"
 
-# Verificar el commit
-git log --oneline -1
-```
-
-### Crear tag de hotfix
-
-```bash
-# Crear el nuevo tag 1.0.1 en esta rama
-git tag -a 1.0.1 -m "Hotfix 1.0.1 - Critical login bug fix"
-
-# Subir la rama hotfix al remoto
+# Push de la rama hotfix
 git push origin hotfix/critical-bug
 
-# Subir el tag (esto disparará el GitHub Action)
+# Volver a develop
+git checkout develop
+git pull origin develop
+
+# Actualizar package.json a 1.0.1
+npm version 1.0.1 --no-git-tag-version
+
+# Commit en develop
+git add package.json
+git commit -m "chore: bump version to 1.0.1"
+
+# Crear tag apuntando al commit de la rama hotfix
+# Obtener el SHA del último commit en hotfix/critical-bug
+HOTFIX_SHA=$(git rev-parse hotfix/critical-bug)
+git tag -a 1.0.1 -m "Hotfix 1.0.1 - Critical login bug fix" $HOTFIX_SHA
+
+# Push de develop y tag
+git push origin develop
 git push origin 1.0.1
 ```
 
-**Nota:** El push del tag `1.0.1` disparará automáticamente el workflow completo:
-1. Deploy a QAS (automático)
-2. Espera aprobación para PRD
-3. Deploy a PRD (después de aprobar en GitHub)
-4. Backport a develop (solo después de PRD exitoso)
+**Nota sobre el flujo automático:**
+
+Al hacer push del tag `1.0.1`, se dispara el workflow completo:
+1. ✅ Deploy a QAS (automático)
+2. ⏸️ Espera aprobación para PRD (manual en GitHub UI)
+3. ✅ Deploy a PRD (después de aprobar en GitHub)
+4. ✅ Backport a develop (solo si PRD fue exitoso)
+
+**Importante:** El backport traerá el commit del hotfix a develop. Como ya actualizaste el package.json en develop antes de crear el tag, tendrás que resolver el merge si hay diferencias.
 
 ## 5. Verificación del Flujo Completo
 
@@ -289,25 +379,40 @@ git log 1.0.0..develop --oneline
 
 ### Para Releases
 
-1. Desde develop: `git tag -a X.Y.Z -m "Release X.Y.Z"`
-2. `git push origin X.Y.Z`
-3. El workflow automático ejecuta:
-   - Deploy a QAS (automático)
-   - Espera tu aprobación en GitHub Actions
-   - Deploy a PRD (después de aprobar)
-   - Backport a develop (solo si PRD fue exitoso)
-4. Aprobar en GitHub: Actions → Deploy and Backport → Review deployments
-5. Actualizar develop local: `git checkout develop && git pull origin develop`
+**Con Script (Recomendado):**
+```bash
+git checkout develop
+./create-release.sh patch   # o minor, o major
+# El script hace TODO: actualiza package.json, commit, tag, push
+```
+
+**Manual:**
+1. Actualizar package.json: `npm version X.Y.Z --no-git-tag-version`
+2. Commit: `git add package.json && git commit -m "chore: bump version to X.Y.Z"`
+3. Tag: `git tag -a X.Y.Z -m "Release X.Y.Z"`
+4. Push: `git push origin develop && git push origin X.Y.Z`
+5. Aprobar en GitHub: Actions → Deploy and Backport → Review deployments
 
 ### Para Hotfixes
 
-1. `git checkout -b hotfix/descripcion X.Y.Z` (desde tag)
+**Con Script (desde develop):**
+```bash
+# 1. Crear rama hotfix y hacer fixes
+git checkout -b hotfix/bug-fix X.Y.Z
+# ... hacer cambios y commits ...
+git push origin hotfix/bug-fix
+
+# 2. Volver a develop y usar script
+git checkout develop
+./create-release.sh patch  # Incrementa automáticamente
+```
+
+**Manual:**
+1. `git checkout -b hotfix/descripcion X.Y.Z` (desde tag anterior)
 2. Hacer commits de fix
-3. `git tag -a X.Y.Z+1 -m "Hotfix X.Y.Z+1"`
-4. `git push origin hotfix/descripcion`
-5. `git push origin X.Y.Z+1`
-6. Mismo flujo que releases: QAS → Aprobación → PRD → Backport
-7. Actualizar develop local después del backport
+3. `git push origin hotfix/descripcion`
+4. Desde develop: actualizar package.json, commit, tag, push (igual que release)
+5. Aprobar en GitHub: Actions → Deploy and Backport → Review deployments
 
 ## Resumen del Flujo Automático
 
