@@ -111,8 +111,6 @@ jobs:
                 echo >&2 "--------------------------------"
 
                 if [ "$repo_full" = "$current_repo" ] && [ "$pr_number" -eq "$current_pr_number" ]; then
-                  echo >&2 "found_current: $found_current"
-                  echo >&2 "--------------------------------"
                   found_current=true
                   break
                 fi
@@ -150,7 +148,9 @@ jobs:
               done < <(echo "$page_data" | jq -c '.items[]')
 
               if [ "$found_current" = true ]; then
-                break
+                echo >&2 "Found current PR without reviewer: $repo_full#$pr_number"
+                echo ""
+                return 0
               fi
 
               if [ "$(echo "$page_data" | jq '.items | length')" -lt 10 ]; then
@@ -175,8 +175,16 @@ jobs:
             blocking_pr=$(has_previous_pr_without_reviewer "$CURRENT_REPO" "$CURRENT_PR_NUMBER" "$CURRENT_PR_CREATED_AT")
             status=$?
 
+            echo >&2 "status: $status"
+            echo >&2 "blocking_pr: $blocking_pr"
+            echo >&2 "--------------------------------"
+
             if [ "$status" -eq 0 ]; then
               now_epoch=$(date +%s)
+              if [ "$blocking_pr" = "" ]; then
+                echo "✅ No se encontró ningún PR anterior sin reviewer; se continúa con selección de reviewer."
+                break
+              fi
               if [ "$blocking_pr" != "$last_blocking_pr" ]; then
                 last_blocking_pr="$blocking_pr"
                 blocking_since_epoch="$now_epoch"
@@ -194,9 +202,6 @@ jobs:
               echo "⏳ Esperando turno. PR anterior sin reviewer: $blocking_pr. Reintento en ${GATE_SLEEP_SECONDS}s (lleva ${elapsed_blocking}s / ${BLOCKING_GRACE_SECONDS}s de gracia)..."
               sleep "$GATE_SLEEP_SECONDS"
               gate_waited=$((gate_waited + GATE_SLEEP_SECONDS))
-            elif [ "$status" -eq 2 ]; then
-              echo "✅ Cola org-wide libre para este PR; continuando con selección de reviewer."
-              break
             else
               echo "⚠️ No se pudo evaluar la cola org-wide de PRs (API o búsqueda); se continúa con selección de reviewer."
               break
