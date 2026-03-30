@@ -85,12 +85,12 @@ jobs:
             github_search_issues_total_count() {
               local search_q="$1"
               local attempt=0
-              local hdr body status FULL_RESPONSE remaining reset retry_after wait_sec now jitter
+              local hdr body status FULL_RESPONSE remaining reset retry_after wait_sec now
 
               while [ "$attempt" -lt "$MAX_SEARCH_ATTEMPTS" ]; do
                 attempt=$((attempt + 1))
                 hdr=$(mktemp)
-                # Respuesta JSON + "|" + código HTTP (mismo patrón que otros servicios); -D guarda cabeceras para rate limit
+
                 FULL_RESPONSE=$(curl -sS -D "$hdr" -G \
                   -H "Authorization: Bearer $GITHUB_TOKEN" \
                   --data-urlencode "q=$search_q" \
@@ -138,9 +138,6 @@ jobs:
             first_user=true
 
             for github_user in "${github_users[@]}"; do
-              # Add sleep to avoid a early rate limit error
-              sleep $((RANDOM % 3))
-
               # Count PRs abiertos con review request pendiente
               pending_reviews=$(github_search_issues_total_count "org:${ORG} type:pr state:open review-requested:${github_user}" || echo 0)
 
