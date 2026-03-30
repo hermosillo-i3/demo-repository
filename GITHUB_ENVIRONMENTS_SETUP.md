@@ -64,8 +64,14 @@ Environments
 
 ### Cuando haces push de un tag:
 
+**Release (ej: 1.0.1):**
 ```bash
-git push origin 1.0.0
+git push origin 1.0.1
+```
+
+**Hotfix (ej: 1.1.0):**
+```bash
+git push origin 1.1.0
 ```
 
 ### GitHub Actions ejecuta:
@@ -77,25 +83,29 @@ git push origin 1.0.0
 
 2. **Job: deploy-prd** (`environment: production`)
    - Necesita que `deploy-qas` termine (`needs: deploy-qas`)
-   - **Se PAUSA esperando aprobación**
-   - En GitHub Actions verás: "Waiting for approval"
-   - Los reviewers reciben notificación
+   - **Se PAUSA esperando aprobación** ⏸️
+   - En GitHub Actions verás: **"Waiting for approval"** (ícono amarillo)
+   - Los reviewers reciben notificación por email
 
-3. **Aprobación Manual**
+3. **Aprobación Manual** (TÚ)
    - Ve a: Actions → Deploy and Backport → (tu workflow run)
-   - Verás un botón amarillo "Review deployments"
-   - Click → Selecciona `production` → Approve and deploy
+   - Verás un botón amarillo **"Review deployments"**
+   - Click → Selecciona `production` → **"Approve and deploy"**
    - Puedes agregar un comentario de aprobación
 
 4. **Job: deploy-prd** (continúa)
    - Después de aprobar, corre el deploy a PRD
    - ✅ Termina
 
-5. **Job: backport-to-develop**
-   - Necesita que `deploy-prd` termine (`needs: deploy-prd`)
-   - Solo corre si PRD fue exitoso
+5. **Job: backport-to-develop** (condicional)
+   - Solo se ejecuta si el tag termina en `.0` (es un hotfix)
+   - Necesita que `deploy-prd` termine exitosamente
    - Hace cherry-pick del commit del tag a develop
    - ✅ Termina
+
+**Resumen:**
+- **Releases (1.0.1):** QAS → Aprobación → PRD → ✅ Fin (no backport)
+- **Hotfixes (1.1.0):** QAS → Aprobación → PRD → Backport → ✅ Fin
 
 ## Seguridad y Permisos
 

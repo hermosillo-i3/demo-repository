@@ -36,7 +36,7 @@ jobs:
     name: Deploy to Production
     runs-on: ubuntu-latest
     needs: deploy-qas
-    environment: production
+    environment: prd
     
     steps:
       - name: Checkout code at tag
@@ -63,6 +63,7 @@ jobs:
     name: Backport to Develop
     runs-on: ubuntu-latest
     needs: deploy-prd
+    if: endsWith(github.ref_name, '.0')
     
     steps:
       - name: Checkout repository
@@ -83,6 +84,7 @@ jobs:
           COMMIT_SHA=$(git rev-list -n 1 $TAG_NAME)
           echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "🔄 Hotfix detectado (tag termina en .0), haciendo backport..."
       
       - name: Cherry-pick commit to develop
         run: |

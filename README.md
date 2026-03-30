@@ -24,4 +24,8 @@ Este repositorio implementa un flujo de trabajo basado en Git con `develop` como
 
 ### ⚙️ GitHub Actions
 
-- **`.github/workflows/backport-hotfix.yml`** - Deploy automático: QAS → PRD (aprobación) → Backport
+- **`.github/workflows/backport-hotfix.yml`** - Deploy automático: QAS → PRD (aprobación) → Backport (solo hotfixes)
+
+### 🔧 Troubleshooting
+
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Soluciones a problemas comunes

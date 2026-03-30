@@ -147,7 +147,9 @@ git push origin 1.0.0
 1. Despliega a QAS automáticamente
 2. Espera aprobación manual para PRD
 3. Despliega a PRD (después de aprobar)
-4. Hace backport a develop (solo si PRD fue exitoso)
+4. **NO hace backport** (las releases ya están en develop)
+
+**Nota:** El backport solo se ejecuta para hotfixes (tags que terminan en .0).
 
 ### Aprobar Deploy a Producción
 
@@ -229,9 +231,11 @@ Al hacer push del tag `1.1.0`, se dispara el workflow completo:
 1. ✅ Deploy a QAS (automático)
 2. ⏸️ Espera aprobación para PRD (manual en GitHub UI)
 3. ✅ Deploy a PRD (después de aprobar en GitHub)
-4. ✅ Backport a develop (solo si PRD fue exitoso)
+4. ✅ **Backport a develop** (se ejecuta porque el tag termina en .0 = hotfix)
 
-**Importante:** El commit con el package.json actualizado ya está en develop (lo hiciste antes de crear el tag), por lo que el backport no causará conflictos en package.json.
+**Diferencia con releases:**
+- Releases (1.0.1, 1.0.2): NO hacen backport (ya están en develop)
+- Hotfixes (1.1.0, 1.2.0): SÍ hacen backport (vienen de rama hotfix)
 
 ## 5. Verificación del Flujo Completo
 
@@ -410,8 +414,9 @@ git push origin 1.1.0
 
 ## Resumen del Flujo Automático
 
+### Para Releases (1.0.1, 1.0.2, etc.)
 ```
-Push Tag 1.0.0
+Push Tag 1.0.1
     ↓
 Deploy QAS (automático)
     ↓
@@ -419,9 +424,26 @@ Deploy QAS (automático)
     ↓
 Deploy PRD (después de aprobar)
     ↓
-Backport a develop (automático si PRD OK)
+✅ FIN (NO backport, ya está en develop)
 ```
 
-**Punto de control:** La aprobación manual es tu gate de calidad antes de PRD.
+### Para Hotfixes (1.1.0, 1.2.0, etc.)
+```
+Push Tag 1.1.0
+    ↓
+Deploy QAS (automático)
+    ↓
+⏸️ PAUSA - Espera Aprobación Manual ⏸️
+    ↓
+Deploy PRD (después de aprobar)
+    ↓
+Backport a develop (solo si PRD OK)
+    ↓
+✅ FIN
+```
+
+**Puntos de control:**
+- Aprobación manual es tu gate de calidad antes de PRD
+- Backport automático solo para hotfixes (detectado por tag terminando en .0)
 
 **Formato de tags:** Solo números (1.0.0, 1.0.1, 2.0.0, etc.) - sin prefijo 'v'

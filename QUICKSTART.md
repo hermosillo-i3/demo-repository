@@ -63,15 +63,21 @@ El push del tag dispara automáticamente:
 1. ✅ **Deploy a QAS** - Se ejecuta solo
 2. ⏸️ **Espera Aprobación** - Ve a GitHub Actions
 3. ✅ **Deploy a PRD** - Después de aprobar
-4. ✅ **Backport a develop** - Si PRD OK
+4. ✅ **Backport a develop** - Solo para hotfixes (tags que terminan en .0)
+
+**Nota:** 
+- Releases (1.0.1, 1.0.2) → **NO** hacen backport (ya están en develop)
+- Hotfixes (1.1.0, 1.2.0) → **SÍ** hacen backport
 
 ### 4. Aprobar Deploy a Producción
 
 1. Ve a: `https://github.com/TU-ORG/TU-REPO/actions`
 2. Click en el workflow "Deploy and Backport"
-3. Verás: **"This workflow is waiting for approval"**
+3. Verás: **"Waiting for approval"** (ícono amarillo ⏸️)
 4. Click en **"Review deployments"**
 5. Selecciona `production` → **"Approve and deploy"**
+
+**IMPORTANTE:** Si el deploy a PRD corre sin esperar aprobación, ve a [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Problema 9.
 
 ### 5. Verificar
 
