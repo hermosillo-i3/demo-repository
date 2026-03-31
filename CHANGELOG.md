@@ -6,3 +6,7 @@ v 1.0.3
 \n## [Unreleased]\n- Test feature 2 - commit 1
 - Test feature 2 - commit 2
 - Test feature 2 - commit 3
+- Test feature 2 - commit 3
+- Test feature x - commit 3
+ Test feature x - commit 3
+  Test feature x - commit 3
