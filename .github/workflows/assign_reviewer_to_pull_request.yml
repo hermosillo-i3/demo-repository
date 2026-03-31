@@ -27,7 +27,6 @@ jobs:
         run: |
           MAX_SEARCH_ATTEMPTS=10
           MAX_GATE_WAIT_SECONDS="600"
-          GATE_SLEEP_SECONDS="15"
           PR_WITHOUT_REVIEWER_GRACE_SECONDS="180"
           PR_TIME_END="$CURRENT_PR_CREATED_AT"
           TEN_MIN_AGO_UTC=$(date -u -d "$PR_TIME_END - 10 minutes" +%Y-%m-%dT%H:%M:%SZ)
@@ -201,9 +200,16 @@ jobs:
               break
             fi
 
-            echo "⏳ Esperando ${GATE_SLEEP_SECONDS}s ${wait_reason}."
-            sleep "$GATE_SLEEP_SECONDS"
-            gate_waited=$((gate_waited + GATE_SLEEP_SECONDS))
+            if [ "$gate_waited" -lt 10 ]; then
+              current_sleep=5
+            elif [ "$gate_waited" -lt 30 ]; then
+              current_sleep=10
+            else
+              current_sleep=15
+            fi
+            echo "⏳ Esperando ${current_sleep}s ${wait_reason}."
+            sleep "$current_sleep"
+            gate_waited=$((gate_waited + current_sleep))
           done
 
   select-reviewer:
