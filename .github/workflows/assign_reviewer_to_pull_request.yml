@@ -29,8 +29,8 @@ jobs:
           MAX_GATE_WAIT_SECONDS="600"
           GATE_SLEEP_SECONDS="15"
           PR_WITHOUT_REVIEWER_GRACE_SECONDS="180"
-          NOW_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          TEN_MIN_AGO_UTC=$(date -u -d '10 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
+          PR_TIME_START=CURRENT_PR_CREATED_AT
+          TEN_MIN_AGO=PR_TIME_START - 10 minutes
 
           # Helper function to make a GitHub API request with retries
           github_api_request_with_retries() {
@@ -98,9 +98,9 @@ jobs:
             while [ "$page" -le 10 ]; do
               # Get previous open PRs without reviewer from the last 10 minutes and excluding approved reviews
               page_data=$(github_api_request_with_retries \
-                "https://api.github.com/search/issues?q=org:${ORG}+is:pr+is:open+created:${TEN_MIN_AGO_UTC}..${NOW_UTC}+-review:approved&sort=created&order=asc&per_page=10&page=${page}" \
+                "https://api.github.com/search/issues?q=org:${ORG}+is:pr+is:open+created:${TEN_MIN_AGO}..${PR_TIME_START}+-review:approved&sort=created&order=asc&per_page=10&page=${page}" \
                 '.items | type == "array"' \
-                "search/issues org-wide abiertos últimos 10 min (${TEN_MIN_AGO_UTC}..${NOW_UTC})") || return 1
+                "search/issues org-wide abiertos últimos 10 min (${TEN_MIN_AGO}..${PR_TIME_START})") || return 1
 
               # Iterate through the PRs
               while IFS= read -r item; do
@@ -169,6 +169,7 @@ jobs:
           last_pr_without_reviewer=""
           last_pr_without_reviewer_since=""
           while true; do
+            echo >&2 "Checking for previous PRs without reviewer..."
             pr_without_reviewer=$(get_previous_pr_without_reviewer "$CURRENT_REPO" "$CURRENT_PR_NUMBER" "$CURRENT_PR_CREATED_AT")
             status=$?
 
