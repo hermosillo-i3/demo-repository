@@ -97,7 +97,7 @@ jobs:
             page_data=$(github_api_request_with_retries \
               "https://api.github.com/search/issues?q=org:${ORG}+is:pr+is:open+created:${TEN_MIN_AGO_UTC}..${PR_TIME_END}+-review:approved&sort=created&order=asc&per_page=20&page=1" \
               '.items | type == "array"' \
-              "search/issues org-wide abiertos últimos 10 min (${TEN_MIN_AGO_UTC}..${PR_TIME_END}) page=1") || return 1
+              "search/issues org-wide abiertos últimos 10 min") || return 1
 
             # Iterate through the PRs
             while IFS= read -r item; do
