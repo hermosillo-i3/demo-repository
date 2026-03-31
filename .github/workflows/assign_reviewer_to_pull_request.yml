@@ -200,9 +200,7 @@ jobs:
               break
             fi
 
-            if [ "$gate_waited" -lt 10 ]; then
-              current_sleep=5
-            elif [ "$gate_waited" -lt 30 ]; then
+            if [ "$gate_waited" -lt 30 ]; then
               current_sleep=10
             else
               current_sleep=15
