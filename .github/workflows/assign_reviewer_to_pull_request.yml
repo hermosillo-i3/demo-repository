@@ -99,9 +99,7 @@ jobs:
               '.items | type == "array"' \
               "search/issues org-wide abiertos últimos 10 min (${TEN_MIN_AGO_UTC}..${PR_TIME_END}) page=1") || return 1
 
-            echo >&2 "--------------------------------"
-            echo >&2 "Page data: $page_data"
-            echo >&2 "--------------------------------"
+            echo >&2 "Total de PRs encontrados: $(echo "$page_data" | jq '.total_count' || echo 0)"
 
             # Iterate through the PRs
             while IFS= read -r item; do
@@ -114,20 +112,14 @@ jobs:
               author_login=$(echo "$item" | jq -r '.user.login // empty')
 
               echo >&2 "--------------------------------"
-              echo >&2 "PR: $repo_full#$pr_number"
-              echo >&2 "Created at: $pr_created_at"
-              echo >&2 "URL: $pr_url"
-              echo >&2 "Author: $author_login"
+              echo >&2 "PR encontrado: $repo_full#$pr_number"
+              echo >&2 "Autor: $author_login"
               echo >&2 "--------------------------------"
 
               if [ "$author_login" = "github-actions[bot]" ]; then
                 echo >&2 "⏩ Omitiendo PR de github-actions[bot]: $repo_full#$pr_number"
                 continue
               fi
-
-              echo >&2 "Current PR: $current_repo#$current_pr_number"
-              echo >&2 "Current PR created at: $current_pr_created_at"
-              echo >&2 "--------------------------------"
 
               if [ "$repo_full" = "$current_repo" ] && [ "$pr_number" -eq "$current_pr_number" ]; then
                 found_current=true
@@ -170,7 +162,10 @@ jobs:
           last_pr_without_reviewer=""
           last_pr_without_reviewer_since=""
           while true; do
+            echo "PR actual: $CURRENT_REPO#$CURRENT_PR_NUMBER"
+            echo "--------------------------------"
             echo "🔍 Buscando PRs anteriores sin reviewer..."
+
             if pr_without_reviewer=$(find_previous_pr_without_reviewer "$CURRENT_REPO" "$CURRENT_PR_NUMBER" "$CURRENT_PR_CREATED_AT"); then
               status=0
             else
