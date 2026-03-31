@@ -109,10 +109,22 @@ jobs:
               pr_url=$(echo "$item" | jq -r '.pull_request.url')
               author_login=$(echo "$item" | jq -r '.user.login // empty')
 
+              echo >&2 "--------------------------------"
+              echo >&2 "PR: $repo_full#$pr_number"
+              echo >&2 "Created at: $pr_created_at"
+              echo >&2 "URL: $pr_url"
+              echo >&2 "Author: $author_login"
+              echo >&2 "--------------------------------"
+
               if [ "$author_login" = "github-actions[bot]" ]; then
                 echo >&2 "⏩ Omitiendo PR de github-actions[bot]: $repo_full#$pr_number"
                 continue
               fi
+
+              echo >&2 "--------------------------------"
+              echo >&2 "Current PR: $current_repo#$current_pr_number"
+              echo >&2 "Current PR created at: $current_pr_created_at"
+              echo >&2 "--------------------------------"
 
               if [ "$repo_full" = "$current_repo" ] && [ "$pr_number" -eq "$current_pr_number" ]; then
                 found_current=true
