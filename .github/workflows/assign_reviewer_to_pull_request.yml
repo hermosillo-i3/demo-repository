@@ -27,7 +27,7 @@ jobs:
         run: |
           MAX_SEARCH_ATTEMPTS=10
           MAX_GATE_WAIT_SECONDS="600"
-          PR_WITHOUT_REVIEWER_GRACE_SECONDS="180"
+          PR_WITHOUT_REVIEWER_GRACE_SECONDS="300"
           PR_TIME_END="$CURRENT_PR_CREATED_AT"
           TEN_MIN_AGO_UTC=$(date -u -d "$PR_TIME_END - 10 minutes" +%Y-%m-%dT%H:%M:%SZ)
 
